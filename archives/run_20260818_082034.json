@@ -1,0 +1,182 @@
+{
+  "violations": [
+    {
+      "id": 1,
+      "track_id": 6,
+      "plate_number": null,
+      "plate_confidence": null,
+      "violation_type": "restricted_zone",
+      "vehicle_class": "car",
+      "location": "CAM_NGA_TU_01",
+      "timestamp": "2026-08-17 16:39:41.718946",
+      "evidence_image_path": "evidence\\restricted_zone_6_20260817_163941_713944.jpg",
+      "reviewed": 0
+    },
+    {
+      "id": 2,
+      "track_id": 11,
+      "plate_number": null,
+      "plate_confidence": null,
+      "violation_type": "restricted_zone",
+      "vehicle_class": "car",
+      "location": "CAM_NGA_TU_01",
+      "timestamp": "2026-08-17 16:39:49.455501",
+      "evidence_image_path": "evidence\\restricted_zone_11_20260817_163949_449842.jpg",
+      "reviewed": 0
+    },
+    {
+      "id": 3,
+      "track_id": 13,
+      "plate_number": null,
+      "plate_confidence": null,
+      "violation_type": "restricted_zone",
+      "vehicle_class": "car",
+      "location": "CAM_NGA_TU_01",
+      "timestamp": "2026-08-17 16:39:52.456313",
+      "evidence_image_path": "evidence\\restricted_zone_13_20260817_163952_450257.jpg",
+      "reviewed": 0
+    },
+    {
+      "id": 4,
+      "track_id": 16,
+      "plate_number": null,
+      "plate_confidence": null,
+      "violation_type": "restricted_zone",
+      "vehicle_class": "truck",
+      "location": "CAM_NGA_TU_01",
+      "timestamp": "2026-08-17 16:40:10.575784",
+      "evidence_image_path": "evidence\\restricted_zone_16_20260817_164010_571072.jpg",
+      "reviewed": 0
+    }
+  ],
+  "traffic_stats": [],
+  "roi_occupancy": [],
+  "behavior_events": [
+    {
+      "id": 1,
+      "track_id": "b'\\x01\\x00\\x00\\x00\\x00\\x00\\x00\\x00'",
+      "event_type": "lane_weaving",
+      "detail": "Doi huong dot ngot 178 do",
+      "vehicle_class": "car",
+      "location": "CAM_NGA_TU_01",
+      "timestamp": "2026-08-17 16:39:03.700455"
+    },
+    {
+      "id": 2,
+      "track_id": "b'\\x03\\x00\\x00\\x00\\x00\\x00\\x00\\x00'",
+      "event_type": "lane_weaving",
+      "detail": "Doi huong dot ngot 159 do",
+      "vehicle_class": "car",
+      "location": "CAM_NGA_TU_01",
+      "timestamp": "2026-08-17 16:39:14.109225"
+    },
+    {
+      "id": 3,
+      "track_id": "b'\\x05\\x00\\x00\\x00\\x00\\x00\\x00\\x00'",
+      "event_type": "lane_weaving",
+      "detail": "Doi huong dot ngot 37 do",
+      "vehicle_class": "bus",
+      "location": "CAM_NGA_TU_01",
+      "timestamp": "2026-08-17 16:39:18.355069"
+    },
+    {
+      "id": 4,
+      "track_id": "b'\\x04\\x00\\x00\\x00\\x00\\x00\\x00\\x00'",
+      "event_type": "lane_weaving",
+      "detail": "Doi huong dot ngot 47 do",
+      "vehicle_class": "car",
+      "location": "CAM_NGA_TU_01",
+      "timestamp": "2026-08-17 16:39:19.387008"
+    },
+    {
+      "id": 5,
+      "track_id": "b'\\x06\\x00\\x00\\x00\\x00\\x00\\x00\\x00'",
+      "event_type": "lane_weaving",
+      "detail": "Doi huong dot ngot 161 do",
+      "vehicle_class": "car",
+      "location": "CAM_NGA_TU_01",
+      "timestamp": "2026-08-17 16:39:32.229624"
+    },
+    {
+      "id": 6,
+      "track_id": "b'\\x07\\x00\\x00\\x00\\x00\\x00\\x00\\x00'",
+      "event_type": "lane_weaving",
+      "detail": "Doi huong dot ngot 155 do",
+      "vehicle_class": "bus",
+      "location": "CAM_NGA_TU_01",
+      "timestamp": "2026-08-17 16:39:34.265219"
+    },
+    {
+      "id": 7,
+      "track_id": "b'\\x08\\x00\\x00\\x00\\x00\\x00\\x00\\x00'",
+      "event_type": "lane_weaving",
+      "detail": "Doi huong dot ngot 157 do",
+      "vehicle_class": "car",
+      "location": "CAM_NGA_TU_01",
+      "timestamp": "2026-08-17 16:39:40.484866"
+    },
+    {
+      "id": 8,
+      "track_id": "b'\\t\\x00\\x00\\x00\\x00\\x00\\x00\\x00'",
+      "event_type": "lane_weaving",
+      "detail": "Doi huong dot ngot 147 do",
+      "vehicle_class": "car",
+      "location": "CAM_NGA_TU_01",
+      "timestamp": "2026-08-17 16:39:47.223616"
+    },
+    {
+      "id": 9,
+      "track_id": "b'\\n\\x00\\x00\\x00\\x00\\x00\\x00\\x00'",
+      "event_type": "lane_weaving",
+      "detail": "Doi huong dot ngot 167 do",
+      "vehicle_class": "truck",
+      "location": "CAM_NGA_TU_01",
+      "timestamp": "2026-08-17 16:39:47.939609"
+    },
+    {
+      "id": 10,
+      "track_id": "b'\\x0b\\x00\\x00\\x00\\x00\\x00\\x00\\x00'",
+      "event_type": "lane_weaving",
+      "detail": "Doi huong dot ngot 159 do",
+      "vehicle_class": "car",
+      "location": "CAM_NGA_TU_01",
+      "timestamp": "2026-08-17 16:39:50.766451"
+    },
+    {
+      "id": 11,
+      "track_id": "b'\\x0c\\x00\\x00\\x00\\x00\\x00\\x00\\x00'",
+      "event_type": "lane_weaving",
+      "detail": "Doi huong dot ngot 61 do",
+      "vehicle_class": "truck",
+      "location": "CAM_NGA_TU_01",
+      "timestamp": "2026-08-17 16:39:51.555484"
+    },
+    {
+      "id": 12,
+      "track_id": "b'\\r\\x00\\x00\\x00\\x00\\x00\\x00\\x00'",
+      "event_type": "lane_weaving",
+      "detail": "Doi huong dot ngot 42 do",
+      "vehicle_class": "car",
+      "location": "CAM_NGA_TU_01",
+      "timestamp": "2026-08-17 16:39:52.917224"
+    },
+    {
+      "id": 13,
+      "track_id": "b'\\x0e\\x00\\x00\\x00\\x00\\x00\\x00\\x00'",
+      "event_type": "lane_weaving",
+      "detail": "Doi huong dot ngot 158 do",
+      "vehicle_class": "truck",
+      "location": "CAM_NGA_TU_01",
+      "timestamp": "2026-08-17 16:39:56.396852"
+    },
+    {
+      "id": 14,
+      "track_id": "b'\\x10\\x00\\x00\\x00\\x00\\x00\\x00\\x00'",
+      "event_type": "lane_weaving",
+      "detail": "Doi huong dot ngot 59 do",
+      "vehicle_class": "car",
+      "location": "CAM_NGA_TU_01",
+      "timestamp": "2026-08-17 16:40:10.149956"
+    }
+  ]
+}

@@ -1,0 +1,564 @@
+{
+  "violations": [
+    {
+      "id": 1,
+      "track_id": 7,
+      "plate_number": null,
+      "plate_confidence": null,
+      "violation_type": "restricted_zone",
+      "vehicle_class": "car",
+      "location": "CAM_NGA_TU_01",
+      "timestamp": "2026-08-18 14:23:59.942509",
+      "evidence_image_path": "evidence\\restricted_zone_7_20260818_142359_937329.jpg",
+      "reviewed": 0
+    },
+    {
+      "id": 2,
+      "track_id": 16,
+      "plate_number": null,
+      "plate_confidence": null,
+      "violation_type": "restricted_zone",
+      "vehicle_class": "car",
+      "location": "CAM_NGA_TU_01",
+      "timestamp": "2026-08-18 14:24:10.235293",
+      "evidence_image_path": "evidence\\restricted_zone_16_20260818_142410_230461.jpg",
+      "reviewed": 0
+    },
+    {
+      "id": 3,
+      "track_id": 22,
+      "plate_number": null,
+      "plate_confidence": null,
+      "violation_type": "restricted_zone",
+      "vehicle_class": "truck",
+      "location": "CAM_NGA_TU_01",
+      "timestamp": "2026-08-18 14:24:13.530745",
+      "evidence_image_path": "evidence\\restricted_zone_22_20260818_142413_523838.jpg",
+      "reviewed": 0
+    },
+    {
+      "id": 4,
+      "track_id": 36,
+      "plate_number": null,
+      "plate_confidence": null,
+      "violation_type": "restricted_zone",
+      "vehicle_class": "truck",
+      "location": "CAM_NGA_TU_01",
+      "timestamp": "2026-08-18 14:25:14.462150",
+      "evidence_image_path": "evidence\\restricted_zone_36_20260818_142514_456624.jpg",
+      "reviewed": 0
+    },
+    {
+      "id": 5,
+      "track_id": 41,
+      "plate_number": null,
+      "plate_confidence": null,
+      "violation_type": "restricted_zone",
+      "vehicle_class": "truck",
+      "location": "CAM_NGA_TU_01",
+      "timestamp": "2026-08-18 14:25:23.851650",
+      "evidence_image_path": "evidence\\restricted_zone_41_20260818_142523_846169.jpg",
+      "reviewed": 0
+    },
+    {
+      "id": 6,
+      "track_id": 46,
+      "plate_number": null,
+      "plate_confidence": null,
+      "violation_type": "restricted_zone",
+      "vehicle_class": "bus",
+      "location": "CAM_NGA_TU_01",
+      "timestamp": "2026-08-18 14:25:37.706037",
+      "evidence_image_path": "evidence\\restricted_zone_46_20260818_142537_700228.jpg",
+      "reviewed": 0
+    },
+    {
+      "id": 7,
+      "track_id": 52,
+      "plate_number": null,
+      "plate_confidence": null,
+      "violation_type": "restricted_zone",
+      "vehicle_class": "bus",
+      "location": "CAM_NGA_TU_01",
+      "timestamp": "2026-08-18 14:26:06.897892",
+      "evidence_image_path": "evidence\\restricted_zone_52_20260818_142606_892885.jpg",
+      "reviewed": 0
+    },
+    {
+      "id": 8,
+      "track_id": 58,
+      "plate_number": null,
+      "plate_confidence": null,
+      "violation_type": "restricted_zone",
+      "vehicle_class": "bus",
+      "location": "CAM_NGA_TU_01",
+      "timestamp": "2026-08-18 14:26:30.611806",
+      "evidence_image_path": "evidence\\restricted_zone_58_20260818_142630_606667.jpg",
+      "reviewed": 0
+    },
+    {
+      "id": 9,
+      "track_id": 60,
+      "plate_number": null,
+      "plate_confidence": null,
+      "violation_type": "restricted_zone",
+      "vehicle_class": "bus",
+      "location": "CAM_NGA_TU_01",
+      "timestamp": "2026-08-18 14:26:41.208360",
+      "evidence_image_path": "evidence\\restricted_zone_60_20260818_142641_203374.jpg",
+      "reviewed": 0
+    },
+    {
+      "id": 10,
+      "track_id": 64,
+      "plate_number": null,
+      "plate_confidence": null,
+      "violation_type": "restricted_zone",
+      "vehicle_class": "truck",
+      "location": "CAM_NGA_TU_01",
+      "timestamp": "2026-08-18 14:27:09.573779",
+      "evidence_image_path": "evidence\\restricted_zone_64_20260818_142709_568766.jpg",
+      "reviewed": 0
+    },
+    {
+      "id": 11,
+      "track_id": 69,
+      "plate_number": null,
+      "plate_confidence": null,
+      "violation_type": "restricted_zone",
+      "vehicle_class": "truck",
+      "location": "CAM_NGA_TU_01",
+      "timestamp": "2026-08-18 14:27:18.803620",
+      "evidence_image_path": "evidence\\restricted_zone_69_20260818_142718_798285.jpg",
+      "reviewed": 0
+    }
+  ],
+  "traffic_stats": [
+    {
+      "id": 1,
+      "timestamp": "2026-08-18 07:23:59",
+      "location": "CAM_NGA_TU_01",
+      "line_id": "0",
+      "vehicle_class": "truck",
+      "direction": "in",
+      "count": 1
+    },
+    {
+      "id": 2,
+      "timestamp": "2026-08-18 07:24:00",
+      "location": "CAM_NGA_TU_01",
+      "line_id": "0",
+      "vehicle_class": "truck",
+      "direction": "in",
+      "count": 1
+    },
+    {
+      "id": 3,
+      "timestamp": "2026-08-18 07:24:02",
+      "location": "CAM_NGA_TU_01",
+      "line_id": "0",
+      "vehicle_class": "car",
+      "direction": "in",
+      "count": 1
+    },
+    {
+      "id": 4,
+      "timestamp": "2026-08-18 07:24:04",
+      "location": "CAM_NGA_TU_01",
+      "line_id": "0",
+      "vehicle_class": "car",
+      "direction": "in",
+      "count": 1
+    },
+    {
+      "id": 5,
+      "timestamp": "2026-08-18 07:24:09",
+      "location": "CAM_NGA_TU_01",
+      "line_id": "0",
+      "vehicle_class": "car",
+      "direction": "in",
+      "count": 1
+    },
+    {
+      "id": 6,
+      "timestamp": "2026-08-18 07:24:11",
+      "location": "CAM_NGA_TU_01",
+      "line_id": "0",
+      "vehicle_class": "car",
+      "direction": "in",
+      "count": 1
+    },
+    {
+      "id": 7,
+      "timestamp": "2026-08-18 07:24:22",
+      "location": "CAM_NGA_TU_01",
+      "line_id": "0",
+      "vehicle_class": "car",
+      "direction": "in",
+      "count": 1
+    },
+    {
+      "id": 8,
+      "timestamp": "2026-08-18 07:24:34",
+      "location": "CAM_NGA_TU_01",
+      "line_id": "0",
+      "vehicle_class": "car",
+      "direction": "in",
+      "count": 1
+    },
+    {
+      "id": 9,
+      "timestamp": "2026-08-18 07:24:48",
+      "location": "CAM_NGA_TU_01",
+      "line_id": "0",
+      "vehicle_class": "car",
+      "direction": "in",
+      "count": 1
+    },
+    {
+      "id": 10,
+      "timestamp": "2026-08-18 07:24:58",
+      "location": "CAM_NGA_TU_01",
+      "line_id": "0",
+      "vehicle_class": "car",
+      "direction": "in",
+      "count": 1
+    },
+    {
+      "id": 11,
+      "timestamp": "2026-08-18 07:25:03",
+      "location": "CAM_NGA_TU_01",
+      "line_id": "0",
+      "vehicle_class": "car",
+      "direction": "in",
+      "count": 1
+    },
+    {
+      "id": 12,
+      "timestamp": "2026-08-18 07:25:13",
+      "location": "CAM_NGA_TU_01",
+      "line_id": "0",
+      "vehicle_class": "truck",
+      "direction": "in",
+      "count": 1
+    },
+    {
+      "id": 13,
+      "timestamp": "2026-08-18 07:25:17",
+      "location": "CAM_NGA_TU_01",
+      "line_id": "0",
+      "vehicle_class": "car",
+      "direction": "in",
+      "count": 1
+    },
+    {
+      "id": 14,
+      "timestamp": "2026-08-18 07:25:22",
+      "location": "CAM_NGA_TU_01",
+      "line_id": "0",
+      "vehicle_class": "car",
+      "direction": "in",
+      "count": 1
+    },
+    {
+      "id": 15,
+      "timestamp": "2026-08-18 07:25:27",
+      "location": "CAM_NGA_TU_01",
+      "line_id": "0",
+      "vehicle_class": "car",
+      "direction": "in",
+      "count": 1
+    },
+    {
+      "id": 16,
+      "timestamp": "2026-08-18 07:25:39",
+      "location": "CAM_NGA_TU_01",
+      "line_id": "0",
+      "vehicle_class": "bus",
+      "direction": "in",
+      "count": 1
+    },
+    {
+      "id": 17,
+      "timestamp": "2026-08-18 07:26:11",
+      "location": "CAM_NGA_TU_01",
+      "line_id": "0",
+      "vehicle_class": "car",
+      "direction": "in",
+      "count": 1
+    },
+    {
+      "id": 18,
+      "timestamp": "2026-08-18 07:26:15",
+      "location": "CAM_NGA_TU_01",
+      "line_id": "0",
+      "vehicle_class": "car",
+      "direction": "in",
+      "count": 1
+    },
+    {
+      "id": 19,
+      "timestamp": "2026-08-18 07:26:29",
+      "location": "CAM_NGA_TU_01",
+      "line_id": "0",
+      "vehicle_class": "car",
+      "direction": "in",
+      "count": 1
+    },
+    {
+      "id": 20,
+      "timestamp": "2026-08-18 07:26:30",
+      "location": "CAM_NGA_TU_01",
+      "line_id": "0",
+      "vehicle_class": "bus",
+      "direction": "in",
+      "count": 1
+    },
+    {
+      "id": 21,
+      "timestamp": "2026-08-18 07:26:40",
+      "location": "CAM_NGA_TU_01",
+      "line_id": "0",
+      "vehicle_class": "car",
+      "direction": "in",
+      "count": 1
+    },
+    {
+      "id": 22,
+      "timestamp": "2026-08-18 07:26:49",
+      "location": "CAM_NGA_TU_01",
+      "line_id": "0",
+      "vehicle_class": "car",
+      "direction": "in",
+      "count": 1
+    },
+    {
+      "id": 23,
+      "timestamp": "2026-08-18 07:27:05",
+      "location": "CAM_NGA_TU_01",
+      "line_id": "0",
+      "vehicle_class": "car",
+      "direction": "in",
+      "count": 1
+    },
+    {
+      "id": 24,
+      "timestamp": "2026-08-18 07:27:08",
+      "location": "CAM_NGA_TU_01",
+      "line_id": "0",
+      "vehicle_class": "car",
+      "direction": "in",
+      "count": 1
+    },
+    {
+      "id": 25,
+      "timestamp": "2026-08-18 07:27:15",
+      "location": "CAM_NGA_TU_01",
+      "line_id": "0",
+      "vehicle_class": "car",
+      "direction": "in",
+      "count": 1
+    },
+    {
+      "id": 26,
+      "timestamp": "2026-08-18 07:27:22",
+      "location": "CAM_NGA_TU_01",
+      "line_id": "0",
+      "vehicle_class": "car",
+      "direction": "in",
+      "count": 1
+    }
+  ],
+  "roi_occupancy": [],
+  "behavior_events": [
+    {
+      "id": 1,
+      "track_id": "b'\\n\\x00\\x00\\x00\\x00\\x00\\x00\\x00'",
+      "event_type": "lane_weaving",
+      "detail": "Doi huong dot ngot 42 do",
+      "vehicle_class": "car",
+      "location": "CAM_NGA_TU_01",
+      "timestamp": "2026-08-18 14:24:00.169185"
+    },
+    {
+      "id": 2,
+      "track_id": "b'\\x10\\x00\\x00\\x00\\x00\\x00\\x00\\x00'",
+      "event_type": "lane_weaving",
+      "detail": "Doi huong dot ngot 63 do",
+      "vehicle_class": "car",
+      "location": "CAM_NGA_TU_01",
+      "timestamp": "2026-08-18 14:24:08.749571"
+    },
+    {
+      "id": 3,
+      "track_id": "b'\\x11\\x00\\x00\\x00\\x00\\x00\\x00\\x00'",
+      "event_type": "lane_weaving",
+      "detail": "Doi huong dot ngot 39 do",
+      "vehicle_class": "car",
+      "location": "CAM_NGA_TU_01",
+      "timestamp": "2026-08-18 14:24:10.934551"
+    },
+    {
+      "id": 4,
+      "track_id": "b'\\x17\\x00\\x00\\x00\\x00\\x00\\x00\\x00'",
+      "event_type": "lane_weaving",
+      "detail": "Doi huong dot ngot 60 do",
+      "vehicle_class": "car",
+      "location": "CAM_NGA_TU_01",
+      "timestamp": "2026-08-18 14:24:25.694027"
+    },
+    {
+      "id": 5,
+      "track_id": "b'\\x1e\\x00\\x00\\x00\\x00\\x00\\x00\\x00'",
+      "event_type": "lane_weaving",
+      "detail": "Doi huong dot ngot 40 do",
+      "vehicle_class": "unknown",
+      "location": "CAM_NGA_TU_01",
+      "timestamp": "2026-08-18 14:24:51.178376"
+    },
+    {
+      "id": 6,
+      "track_id": "b'#\\x00\\x00\\x00\\x00\\x00\\x00\\x00'",
+      "event_type": "lane_weaving",
+      "detail": "Doi huong dot ngot 37 do",
+      "vehicle_class": "bus",
+      "location": "CAM_NGA_TU_01",
+      "timestamp": "2026-08-18 14:25:03.609511"
+    },
+    {
+      "id": 7,
+      "track_id": "b'$\\x00\\x00\\x00\\x00\\x00\\x00\\x00'",
+      "event_type": "lane_weaving",
+      "detail": "Doi huong dot ngot 37 do",
+      "vehicle_class": "car",
+      "location": "CAM_NGA_TU_01",
+      "timestamp": "2026-08-18 14:25:12.784028"
+    },
+    {
+      "id": 8,
+      "track_id": "b'%\\x00\\x00\\x00\\x00\\x00\\x00\\x00'",
+      "event_type": "lane_weaving",
+      "detail": "Doi huong dot ngot 64 do",
+      "vehicle_class": "car",
+      "location": "CAM_NGA_TU_01",
+      "timestamp": "2026-08-18 14:25:17.012725"
+    },
+    {
+      "id": 9,
+      "track_id": "b'&\\x00\\x00\\x00\\x00\\x00\\x00\\x00'",
+      "event_type": "lane_weaving",
+      "detail": "Doi huong dot ngot 36 do",
+      "vehicle_class": "car",
+      "location": "CAM_NGA_TU_01",
+      "timestamp": "2026-08-18 14:25:22.030008"
+    },
+    {
+      "id": 10,
+      "track_id": "b')\\x00\\x00\\x00\\x00\\x00\\x00\\x00'",
+      "event_type": "lane_weaving",
+      "detail": "Doi huong dot ngot 151 do",
+      "vehicle_class": "truck",
+      "location": "CAM_NGA_TU_01",
+      "timestamp": "2026-08-18 14:25:24.174871"
+    },
+    {
+      "id": 11,
+      "track_id": "b'*\\x00\\x00\\x00\\x00\\x00\\x00\\x00'",
+      "event_type": "lane_weaving",
+      "detail": "Doi huong dot ngot 57 do",
+      "vehicle_class": "unknown",
+      "location": "CAM_NGA_TU_01",
+      "timestamp": "2026-08-18 14:25:30.311313"
+    },
+    {
+      "id": 12,
+      "track_id": "b'.\\x00\\x00\\x00\\x00\\x00\\x00\\x00'",
+      "event_type": "lane_weaving",
+      "detail": "Doi huong dot ngot 41 do",
+      "vehicle_class": "car",
+      "location": "CAM_NGA_TU_01",
+      "timestamp": "2026-08-18 14:25:38.000564"
+    },
+    {
+      "id": 13,
+      "track_id": "b'/\\x00\\x00\\x00\\x00\\x00\\x00\\x00'",
+      "event_type": "lane_weaving",
+      "detail": "Doi huong dot ngot 45 do",
+      "vehicle_class": "car",
+      "location": "CAM_NGA_TU_01",
+      "timestamp": "2026-08-18 14:25:39.158063"
+    },
+    {
+      "id": 14,
+      "track_id": "b'4\\x00\\x00\\x00\\x00\\x00\\x00\\x00'",
+      "event_type": "lane_weaving",
+      "detail": "Doi huong dot ngot 114 do",
+      "vehicle_class": "truck",
+      "location": "CAM_NGA_TU_01",
+      "timestamp": "2026-08-18 14:26:06.669729"
+    },
+    {
+      "id": 15,
+      "track_id": "b'5\\x00\\x00\\x00\\x00\\x00\\x00\\x00'",
+      "event_type": "lane_weaving",
+      "detail": "Doi huong dot ngot 39 do",
+      "vehicle_class": "car",
+      "location": "CAM_NGA_TU_01",
+      "timestamp": "2026-08-18 14:26:11.916664"
+    },
+    {
+      "id": 16,
+      "track_id": "b'6\\x00\\x00\\x00\\x00\\x00\\x00\\x00'",
+      "event_type": "lane_weaving",
+      "detail": "Doi huong dot ngot 37 do",
+      "vehicle_class": "car",
+      "location": "CAM_NGA_TU_01",
+      "timestamp": "2026-08-18 14:26:15.731880"
+    },
+    {
+      "id": 17,
+      "track_id": "b'8\\x00\\x00\\x00\\x00\\x00\\x00\\x00'",
+      "event_type": "lane_weaving",
+      "detail": "Doi huong dot ngot 162 do",
+      "vehicle_class": "car",
+      "location": "CAM_NGA_TU_01",
+      "timestamp": "2026-08-18 14:26:29.222526"
+    },
+    {
+      "id": 18,
+      "track_id": "b'<\\x00\\x00\\x00\\x00\\x00\\x00\\x00'",
+      "event_type": "lane_weaving",
+      "detail": "Doi huong dot ngot 48 do",
+      "vehicle_class": "car",
+      "location": "CAM_NGA_TU_01",
+      "timestamp": "2026-08-18 14:26:40.256126"
+    },
+    {
+      "id": 19,
+      "track_id": "b'=\\x00\\x00\\x00\\x00\\x00\\x00\\x00'",
+      "event_type": "lane_weaving",
+      "detail": "Doi huong dot ngot 41 do",
+      "vehicle_class": "car",
+      "location": "CAM_NGA_TU_01",
+      "timestamp": "2026-08-18 14:26:52.018765"
+    },
+    {
+      "id": 20,
+      "track_id": "b'>\\x00\\x00\\x00\\x00\\x00\\x00\\x00'",
+      "event_type": "lane_weaving",
+      "detail": "Doi huong dot ngot 40 do",
+      "vehicle_class": "bus",
+      "location": "CAM_NGA_TU_01",
+      "timestamp": "2026-08-18 14:27:00.844335"
+    },
+    {
+      "id": 21,
+      "track_id": "b'@\\x00\\x00\\x00\\x00\\x00\\x00\\x00'",
+      "event_type": "lane_weaving",
+      "detail": "Doi huong dot ngot 49 do",
+      "vehicle_class": "truck",
+      "location": "CAM_NGA_TU_01",
+      "timestamp": "2026-08-18 14:27:09.711572"
+    }
+  ]
+}

@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Hệ thống Giám sát Giao thông Thông minh</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<header>
+  <h1>🚦 Hệ thống Giám sát &amp; Phạt nguội Giao thông</h1>
+  <nav>
+    <a href="/" class="active">Dashboard</a>
+    <a href="/analytics">Phân tích</a>
+    <a href="/chatbot">Trợ lý AI</a>
+  </nav>
+</header>
+
+<main class="layout">
+  <section class="video-panel">
+    <div class="video-panel-header">
+      <h2>Camera trực tiếp</h2>
+      <span id="status-badge" class="status-badge">
+        <span class="dot"></span> Đang dừng
+      </span>
+    </div>
+
+    <div class="video-frame">
+      <img id="video-stream" src="/video_feed" alt="Video stream"
+           onerror="this.style.display='none'; document.getElementById('video-placeholder').style.display='flex';">
+      <div id="video-placeholder" class="placeholder" style="display:none;">
+        Chưa có luồng video. Bấm "Bắt đầu" để chạy camera hoặc video đã tải lên.
+      </div>
+    </div>
+
+    <div class="controls">
+      <div class="controls-group main">
+        <button id="btn-start">▶ Bắt đầu</button>
+        <button id="btn-pause">⏸ Tạm dừng</button>
+        <button id="btn-stop">⏹ Dừng</button>
+      </div>
+      <span class="controls-sep"></span>
+      <div class="controls-group tools">
+        <label class="inline-select">Chế độ:
+          <select id="draw-mode">
+            <option value="line">Vẽ Line đếm xe</option>
+            <option value="roi">Vẽ vùng cấm (ROI)</option>
+          </select>
+        </label>
+        <label class="inline-select">Hướng:
+          <select id="line-direction">
+            <option value="in">IN</option>
+            <option value="out">OUT</option>
+          </select>
+        </label>
+        <button id="btn-add-line" class="tool-btn">➕ Thêm Line</button>
+        <button id="btn-save-roi" class="tool-btn">💾 Lưu ROI (4 điểm)</button>
+        <button id="btn-undo" class="tool-btn">↩ Hoàn tác</button>
+        <button id="btn-clear" class="tool-btn danger">🗑 Xóa hết</button>
+        <button id="btn-save-config" class="tool-btn primary">✔ Lưu cấu hình</button>
+      </div>
+    </div>
+    <p id="config-status" class="upload-status"></p>
+    <p class="config-hint">
+      Tải video lên trước, sau đó dùng công cụ ở hàng nút phía trên để vẽ đường kẻ đếm xe hoặc vùng cấm ngay trên khung hình.
+    </p>
+
+    <div class="upload-panel upload-panel-compact">
+      <h3>Nguồn video</h3>
+      <div class="upload-row">
+        <label class="source-radio">
+          <input type="radio" name="video-source-type" value="camera" checked>
+          Camera trực tiếp
+        </label>
+        <label class="source-radio">
+          <input type="radio" name="video-source-type" value="file">
+          Video tải lên
+        </label>
+        <input type="file" id="video-file-input" accept=".mp4,.avi,.mov,.mkv,.webm" disabled>
+        <button id="btn-upload" disabled>⬆ Tải lên</button>
+        <span id="upload-status" class="upload-status"></span>
+      </div>
+    </div>
+
+    <div class="upload-panel">
+      <h3>Cấu hình vùng giám sát (Line đếm xe / Vùng cấm ROI)</h3>
+      <div class="canvas-wrap">
+        <canvas id="config-canvas"></canvas>
+        <div id="canvas-placeholder" class="placeholder">Chưa có khung hình. Tải video lên trước.</div>
+        <div id="canvas-running-msg" class="placeholder" style="display:none;">
+          ▶ Video đang chạy — xem trực tiếp ở khung "Camera trực tiếp" phía trên.<br>
+          Bấm "Dừng" để quay lại vẽ Line / ROI tại đây.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="side-panel">
+    <div class="card">
+      <h3>Số xe theo ROI</h3>
+      <div id="roi-counts-list" class="roi-grid">
+        <div class="empty-state">Chưa có dữ liệu</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Vi phạm gần nhất</h3>
+      <table id="violations-table">
+        <thead>
+          <tr><th>Thời gian</th><th>Loại</th><th>Biển số</th><th>Xe</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h3>Tổng hợp vi phạm theo loại</h3>
+      <ul id="violation-summary-list"><li class="empty-state">Chưa có dữ liệu</li></ul>
+    </div>
+  </section>
+</main>
+
+<script>
+let uploadedVideoPath = null;
+let isRunning = false;
+
+const fileInput = document.getElementById("video-file-input");
+const btnUpload = document.getElementById("btn-upload");
+const uploadStatus = document.getElementById("upload-status");
+const sourceRadios = document.querySelectorAll('input[name="video-source-type"]');
+const statusBadge = document.getElementById("status-badge");
+
+function setStatus(running) {
+  isRunning = running;
+  statusBadge.classList.toggle("live", running);
+  statusBadge.innerHTML = running
+    ? '<span class="dot"></span> Đang chạy'
+    : '<span class="dot"></span> Đang dừng';
+
+  const cvs = document.getElementById("config-canvas");
+  const cvsPlaceholder = document.getElementById("canvas-placeholder");
+  const cvsRunningMsg = document.getElementById("canvas-running-msg");
+  if (running) {
+    cvs.style.display = "none";
+    cvsPlaceholder.style.display = "none";
+    cvsRunningMsg.style.display = "flex";
+  } else {
+    cvsRunningMsg.style.display = "none";
+    // quay lại canvas cấu hình line/ROI (hoặc placeholder nếu chưa có khung hình)
+    if (previewImg) cvs.style.display = "block";
+    else cvsPlaceholder.style.display = "flex";
+  }
+}
+
+sourceRadios.forEach(radio => {
+  radio.onchange = () => {
+    const isFile = document.querySelector('input[name="video-source-type"]:checked').value === "file";
+    fileInput.disabled = !isFile;
+    btnUpload.disabled = !isFile;
+    if (!isFile) {
+      uploadedVideoPath = null;
+      uploadStatus.textContent = "";
+      uploadStatus.className = "upload-status";
+    }
+  };
+});
+
+btnUpload.onclick = async () => {
+  const file = fileInput.files[0];
+  if (!file) {
+    uploadStatus.textContent = "Vui lòng chọn 1 file video trước.";
+    uploadStatus.className = "upload-status error";
+    return;
+  }
+  uploadStatus.textContent = "Đang tải lên...";
+  uploadStatus.className = "upload-status";
+  btnUpload.disabled = true;
+
+  const formData = new FormData();
+  formData.append("video", file);
+
+  try {
+    const res = await fetch("/api/upload_video", { method: "POST", body: formData });
+    const data = await res.json();
+    if (data.status === "ok") {
+      uploadedVideoPath = data.path;
+      uploadStatus.textContent = `Đã tải lên: ${data.filename}. Bấm "Bắt đầu" để xử lý.`;
+      uploadStatus.className = "upload-status ok";
+      loadPreviewFrame();
+    } else {
+      uploadedVideoPath = null;
+      uploadStatus.textContent = `Lỗi: ${data.message}`;
+      uploadStatus.className = "upload-status error";
+    }
+  } catch (e) {
+    uploadStatus.textContent = "Lỗi kết nối khi tải video lên.";
+    uploadStatus.className = "upload-status error";
+  } finally {
+    btnUpload.disabled = false;
+  }
+};
+
+/* ===== Cấu hình Line đếm xe / ROI trên canvas ===== */
+const canvas = document.getElementById("config-canvas");
+const ctx = canvas.getContext("2d");
+const canvasPlaceholder = document.getElementById("canvas-placeholder");
+const drawModeSel = document.getElementById("draw-mode");
+const lineDirSel = document.getElementById("line-direction");
+const configStatus = document.getElementById("config-status");
+
+let previewImg = null;
+let lines = [];       // [{p1:{x,y}, p2:{x,y}, direction:"in"}]
+let roiZones = [];     // [[{x,y}x4], ...]
+let currentROI = [];
+let selLine = null, selPt = null, selROI = null, dragOx = 0, dragOy = 0;
+const LINE_COLORS = ["#4fd1c5", "#f56565", "#ecc94b", "#63b3ed", "#b794f4"];
+
+function loadPreviewFrame() {
+  const img = new Image();
+  img.onload = () => {
+    previewImg = img;
+    canvas.width = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    canvasPlaceholder.style.display = "none";
+    canvas.style.display = "block";
+    redrawCanvas();
+  };
+  img.onerror = () => {
+    canvasPlaceholder.style.display = "flex";
+    canvas.style.display = "none";
+  };
+  img.src = "/api/preview_frame?t=" + Date.now();
+}
+
+function redrawCanvas() {
+  if (!previewImg) return;
+  ctx.drawImage(previewImg, 0, 0);
+
+  lines.forEach((l, i) => {
+    const c = LINE_COLORS[i % LINE_COLORS.length];
+    ctx.strokeStyle = c; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(l.p1.x, l.p1.y); ctx.lineTo(l.p2.x, l.p2.y); ctx.stroke();
+    [l.p1, l.p2].forEach(p => {
+      ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(p.x, p.y, 6, 0, Math.PI * 2); ctx.fill();
+    });
+    ctx.fillStyle = "#fff176"; ctx.font = "14px Arial";
+    ctx.fillText(l.direction.toUpperCase(), l.p1.x + 8, l.p1.y - 8);
+  });
+
+  roiZones.forEach((roi, i) => {
+    ctx.fillStyle = "rgba(245,101,101,.25)"; ctx.strokeStyle = "#f56565"; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(roi[0].x, roi[0].y);
+    for (let k = 1; k < roi.length; k++) ctx.lineTo(roi[k].x, roi[k].y);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#f56565"; ctx.font = "16px Arial";
+    ctx.fillText(`ROI ${i + 1}`, roi[0].x + 8, roi[0].y - 8);
+  });
+
+  if (currentROI.length) {
+    ctx.strokeStyle = "#ecc94b"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(currentROI[0].x, currentROI[0].y);
+    for (let k = 1; k < currentROI.length; k++) ctx.lineTo(currentROI[k].x, currentROI[k].y);
+    if (currentROI.length === 4) ctx.lineTo(currentROI[0].x, currentROI[0].y); // nối điểm 4 về lại điểm 1
+    ctx.stroke();
+    currentROI.forEach((p, i) => {
+      ctx.fillStyle = "#ecc94b"; ctx.beginPath(); ctx.arc(p.x, p.y, 7, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#000"; ctx.font = "11px Arial"; ctx.fillText(i + 1, p.x - 3, p.y + 4);
+    });
+  }
+}
+
+function canvasPos(e) {
+  const r = canvas.getBoundingClientRect();
+  return {
+    x: (e.clientX - r.left) * (canvas.width / r.width),
+    y: (e.clientY - r.top) * (canvas.height / r.height)
+  };
+}
+function dist(x1, y1, x2, y2) { return Math.hypot(x1 - x2, y1 - y2); }
+
+document.getElementById("btn-add-line").onclick = () => {
+  if (!previewImg) { configStatus.textContent = "Chưa có khung hình."; return; }
+  drawModeSel.value = "line";
+  lines.push({
+    p1: { x: 80, y: canvas.height / 2 },
+    p2: { x: canvas.width - 80, y: canvas.height / 2 },
+    direction: lineDirSel.value
+  });
+  redrawCanvas();
+};
+
+document.getElementById("btn-save-roi").onclick = () => {
+  if (currentROI.length !== 4) { configStatus.textContent = "Vùng ROI cần đúng 4 điểm."; return; }
+  roiZones.push([...currentROI]);
+  currentROI = [];
+  configStatus.textContent = "";
+  redrawCanvas();
+};
+
+document.getElementById("btn-undo").onclick = () => {
+  if (drawModeSel.value === "roi") {
+    if (currentROI.length) currentROI.pop();
+    else if (roiZones.length) roiZones.pop();
+  } else if (lines.length) {
+    lines.pop();
+  }
+  redrawCanvas();
+};
+
+document.getElementById("btn-clear").onclick = () => {
+  lines = []; roiZones = []; currentROI = [];
+  redrawCanvas();
+};
+
+canvas.onclick = (e) => {
+  if (drawModeSel.value === "roi" && currentROI.length < 4) {
+    currentROI.push(canvasPos(e));
+    redrawCanvas();
+  }
+};
+
+canvas.onmousedown = (e) => {
+  const { x, y } = canvasPos(e);
+  selLine = selPt = selROI = null;
+  if (drawModeSel.value === "line") {
+    lines.forEach(l => {
+      if (dist(x, y, l.p1.x, l.p1.y) < 12) { selLine = l; selPt = "p1"; }
+      else if (dist(x, y, l.p2.x, l.p2.y) < 12) { selLine = l; selPt = "p2"; }
+    });
+  } else {
+    roiZones.forEach((roi, ri) => roi.forEach((p, pi) => {
+      if (dist(x, y, p.x, p.y) < 12) selROI = { saved: true, ri, pi };
+    }));
+    currentROI.forEach((p, pi) => {
+      if (dist(x, y, p.x, p.y) < 12) selROI = { saved: false, pi };
+    });
+  }
+};
+
+canvas.onmousemove = (e) => {
+  if (!selLine && !selROI) return;
+  const { x, y } = canvasPos(e);
+  if (selLine) {
+    if (selPt === "p1") selLine.p1 = { x, y };
+    else if (selPt === "p2") selLine.p2 = { x, y };
+    redrawCanvas();
+  }
+  if (selROI) {
+    if (selROI.saved) roiZones[selROI.ri][selROI.pi] = { x, y };
+    else currentROI[selROI.pi] = { x, y };
+    redrawCanvas();
+  }
+};
+
+canvas.onmouseup = () => { selLine = selPt = selROI = null; };
+
+document.getElementById("btn-save-config").onclick = async () => {
+  configStatus.textContent = "Đang lưu...";
+  try {
+    await fetch("/api/lines", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ lines })
+    });
+    await fetch("/api/roi", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ roi_zones: roiZones })
+    });
+    configStatus.textContent = `Đã lưu ${lines.length} line, ${roiZones.length} vùng ROI.`;
+    configStatus.className = "upload-status ok";
+  } catch (e) {
+    configStatus.textContent = "Lỗi khi lưu cấu hình.";
+    configStatus.className = "upload-status error";
+  }
+};
+
+document.getElementById("btn-start").onclick = async () => {
+  const isFileMode = document.querySelector('input[name="video-source-type"]:checked').value === "file";
+  if (isFileMode && !uploadedVideoPath) {
+    uploadStatus.textContent = "Bạn cần tải video lên trước khi bắt đầu.";
+    uploadStatus.className = "upload-status error";
+    return;
+  }
+  const source = isFileMode ? uploadedVideoPath : 0;
+  const res = await fetch("/api/start", {
+    method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({source: source, enable_plate_reading: true})
+  });
+  const data = await res.json();
+  if (data.status === "ok") {
+    setStatus(true);
+    document.getElementById("video-placeholder").style.display = "none";
+    document.getElementById("video-stream").style.display = "block";
+  }
+};
+
+document.getElementById("btn-pause").onclick = () => fetch("/api/pause", {method: "POST"});
+document.getElementById("btn-stop").onclick = async () => {
+  await fetch("/api/stop", {method: "POST"});
+  setStatus(false);
+};
+
+async function refreshData() {
+  try {
+    const roiRes = await fetch("/api/roi_counts");
+    const roiData = await roiRes.json();
+    const roiList = document.getElementById("roi-counts-list");
+    const entries = Object.entries(roiData);
+    roiList.innerHTML = entries.length
+      ? entries.map(([id, count]) => `
+          <div class="roi-chip">
+            <div class="roi-num">${count}</div>
+            <div class="roi-label">ROI ${id}</div>
+          </div>
+        `).join("")
+      : '<div class="empty-state">Chưa có dữ liệu</div>';
+
+    const violRes = await fetch("/api/violations?limit=10");
+    const violData = await violRes.json();
+    const tbody = document.querySelector("#violations-table tbody");
+    tbody.innerHTML = violData.length ? violData.map(v => `
+      <tr>
+        <td>${v.timestamp}</td>
+        <td>${v.violation_type}</td>
+        <td>${v.plate_number || "?"}</td>
+        <td>${v.vehicle_class || "?"}</td>
+      </tr>
+    `).join("") : `<tr><td colspan="4" class="empty-state">Chưa có dữ liệu</td></tr>`;
+
+    const sumRes = await fetch("/api/violations/summary");
+    const sumData = await sumRes.json();
+    const sumList = document.getElementById("violation-summary-list");
+    sumList.innerHTML = sumData.length
+      ? sumData.map(s => `<li>${s.violation_type} <strong>${s.total}</strong></li>`).join("")
+      : '<li class="empty-state">Chưa có dữ liệu</li>';
+  } catch (e) {
+    console.error("Loi cap nhat du lieu:", e);
+  }
+}
+
+async function restoreStateOnLoad() {
+  try {
+    // Khôi phục line/ROI đã lưu trước đó
+    const linesRes = await fetch("/api/lines");
+    const linesData = await linesRes.json();
+    if (linesData.lines && linesData.lines.length) lines = linesData.lines;
+
+    const roiRes = await fetch("/api/roi");
+    const roiData = await roiRes.json();
+    if (roiData.roi_zones && roiData.roi_zones.length) roiZones = roiData.roi_zones;
+
+    // Khôi phục trạng thái video đang chạy hay không
+    const statusRes = await fetch("/api/status");
+    const statusData = await statusRes.json();
+
+    if (statusData.video_path) {
+      uploadedVideoPath = statusData.video_path;
+      document.querySelector('input[name="video-source-type"][value="file"]').checked = true;
+      fileInput.disabled = false;
+      btnUpload.disabled = false;
+      uploadStatus.textContent = `Video đã tải lên trước đó: ${statusData.video_path}`;
+      uploadStatus.className = "upload-status ok";
+    }
+
+    if (statusData.running) {
+      setStatus(true);
+      document.getElementById("video-placeholder").style.display = "none";
+      document.getElementById("video-stream").style.display = "block";
+      // reset src để buộc trình duyệt mở lại kết nối MJPEG mới
+      document.getElementById("video-stream").src = "/video_feed?t=" + Date.now();
+    } else {
+      loadPreviewFrame(); // nếu không chạy, hiển thị lại khung hình để vẽ line/ROI
+    }
+
+    redrawCanvas();
+  } catch (e) {
+    console.error("Loi khoi phuc trang thai:", e);
+  }
+}
+
+restoreStateOnLoad();
+
+setInterval(refreshData, 3000);
+refreshData();
+</script>
+</body>
+</html>

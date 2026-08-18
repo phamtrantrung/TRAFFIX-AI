@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Trợ lý AI - Hệ thống Giám sát Giao thông</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+</head>
+<body>
+<header>
+  <h1>🚦 Hệ thống Giám sát &amp; Phạt nguội Giao thông</h1>
+  <nav>
+    <a href="/">Dashboard</a>
+    <a href="/analytics">Phân tích</a>
+    <a href="/chatbot" class="active">Trợ lý AI</a>
+  </nav>
+</header>
+
+<main class="chat-layout">
+  <div id="chat-window" class="chat-window"></div>
+
+  <div class="suggestions">
+    <button class="suggestion-btn">Hôm nay có bao nhiêu vi phạm?</button>
+    <button class="suggestion-btn">Xe nào vi phạm nhiều lần nhất tuần này?</button>
+    <button class="suggestion-btn">Giờ nào đông xe nhất hôm qua?</button>
+  </div>
+
+  <form id="chat-form" class="chat-input-row">
+    <input type="text" id="chat-input" placeholder="Hỏi về dữ liệu giao thông..." autocomplete="off">
+    <button type="submit">Gửi</button>
+  </form>
+</main>
+
+<script>
+const chatWindow = document.getElementById("chat-window");
+const chatForm = document.getElementById("chat-form");
+const chatInput = document.getElementById("chat-input");
+
+function appendMessage(text, sender) {
+  const div = document.createElement("div");
+  div.className = `msg ${sender}`;
+  div.textContent = text;
+  chatWindow.appendChild(div);
+  chatWindow.scrollTop = chatWindow.scrollHeight;
+  return div;
+}
+
+function appendChart(chartData) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "msg bot chart-msg";
+  const canvas = document.createElement("canvas");
+  wrapper.appendChild(canvas);
+  chatWindow.appendChild(wrapper);
+  chatWindow.scrollTop = chatWindow.scrollHeight;
+
+  new Chart(canvas, {
+    type: chartData.type || "bar",
+    data: {
+      labels: chartData.labels,
+      datasets: [{ label: chartData.label, data: chartData.values, backgroundColor: "#4fd1c5" }]
+    },
+    options: { responsive: true, plugins: { legend: { display: false } } }
+  });
+}
+
+async function sendQuestion(question) {
+  appendMessage(question, "user");
+  const loadingEl = appendMessage("Đang xử lý...", "bot-loading");
+
+  try {
+    const res = await fetch("/api/chatbot", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({question})
+    });
+    const data = await res.json();
+    loadingEl.remove();
+    appendMessage(data.answer, "bot");
+    if (data.chart_data) {
+      appendChart(data.chart_data);
+    }
+  } catch (e) {
+    loadingEl.remove();
+    appendMessage("Lỗi kết nối tới server.", "bot");
+  }
+}
+
+chatForm.onsubmit = (e) => {
+  e.preventDefault();
+  const q = chatInput.value.trim();
+  if (!q) return;
+  sendQuestion(q);
+  chatInput.value = "";
+};
+
+document.querySelectorAll(".suggestion-btn").forEach(btn => {
+  btn.onclick = () => sendQuestion(btn.textContent);
+});
+</script>
+</body>
+</html>
