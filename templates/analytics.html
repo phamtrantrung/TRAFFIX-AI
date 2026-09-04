@@ -5,6 +5,7 @@
 <title>Phân tích Giao thông</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
 <style>
   .stats-row {
     display: grid;
@@ -18,47 +19,66 @@
     border-radius: 12px;
     padding: 18px 20px;
   }
-  .stat-box .stat-label {
-    font-size: 13px;
-    color: #9aa4b8;
-    margin-bottom: 6px;
-  }
-  .stat-box .stat-value {
-    font-size: 28px;
-    font-weight: 700;
-    color: #e8ecf4;
-  }
+  .stat-box .stat-label { font-size: 13px; color: #9aa4b8; margin-bottom: 6px; }
+  .stat-box .stat-value { font-size: 28px; font-weight: 700; color: #e8ecf4; }
   .stat-box .stat-value.accent-red { color: #f56565; }
   .stat-box .stat-value.accent-teal { color: #4fd1c5; }
-  .stat-box .stat-sub {
-    font-size: 12px;
-    color: #6b7488;
-    margin-top: 4px;
+  .stat-box .stat-sub { font-size: 12px; color: #6b7488; margin-top: 4px; }
+
+  .analytics-card {
+    background: #171d2e;
+    border: 1px solid #2a3145;
+    border-radius: 12px;
+    padding: 22px;
   }
-  .analytics-table-wrap {
-    overflow-x: auto;
-    margin-top: 18px;
+  .analytics-card h3 { margin: 0 0 16px 0; }
+
+  .time-filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    background: #10141f;
+    border: 1px solid #232a3d;
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-bottom: 20px;
   }
-  table.detail-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 14px;
-  }
-  table.detail-table th, table.detail-table td {
-    padding: 10px 14px;
-    text-align: right;
-    border-bottom: 1px solid #232a3d;
+  .time-filter-bar label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: #9aa4b8;
     white-space: nowrap;
   }
-  table.detail-table th:first-child, table.detail-table td:first-child {
-    text-align: left;
+  .time-filter-bar select,
+  .time-filter-bar input[type="datetime-local"] {
+    background: #1b2236;
+    border: 1px solid #2a3145;
+    color: #e8ecf4;
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 13px;
   }
+  #custom-range-inputs { display: none; align-items: center; gap: 12px; flex-wrap: wrap; }
+  #filter-error {
+    display: none;
+    color: #f56565;
+    font-size: 13px;
+    margin-bottom: 12px;
+  }
+
+  .analytics-table-wrap { overflow-x: auto; margin-top: 20px; }
+  table.detail-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  table.detail-table th, table.detail-table td {
+    padding: 10px 14px; text-align: right;
+    border-bottom: 1px solid #232a3d; white-space: nowrap;
+  }
+  table.detail-table th:first-child, table.detail-table td:first-child { text-align: left; }
   table.detail-table thead th {
-    color: #9aa4b8;
-    font-weight: 600;
-    font-size: 12px;
-    text-transform: uppercase;
-    letter-spacing: .03em;
+    color: #9aa4b8; font-weight: 600; font-size: 12px;
+    text-transform: uppercase; letter-spacing: .03em;
     border-bottom: 2px solid #2a3145;
   }
   table.detail-table tbody tr:hover { background: #1b2236; }
@@ -66,31 +86,7 @@
   table.detail-table td.violation-col { color: #f56565; font-weight: 600; }
   table.detail-table tfoot td { font-weight: 700; color: #e8ecf4; border-top: 2px solid #2a3145; border-bottom: none; }
 
-  /* Fix: .chart-header gốc không phải flex-row nên dropdown bị đẩy đè lên
-     tiêu đề/canvas. Ép layout riêng cho card phân tích, không phụ thuộc
-     CSS gốc của trang. */
-  .chart-card.full .chart-header {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 18px;
-  }
-  .chart-card.full .chart-header h3 {
-    margin: 0;
-    flex: 1 1 260px;
-  }
-  .chart-card.full .time-range-controls {
-    margin-left: auto;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
-  }
-  #chart-combined {
-    display: block;
-    margin-top: 6px;
-  }
+  #export-status { font-size: 12px; color: #6b7488; }
 </style>
 </head>
 <body>
@@ -127,39 +123,38 @@
     </div>
   </div>
 
-  <div class="chart-card full">
-    <div class="chart-header">
-      <h3>Lưu lượng xe theo loại &amp; Vi phạm theo giờ</h3>
-      <div class="time-range-controls">
-        <label class="inline-select">
-          Khoảng thời gian:
-          <select id="days-select">
-            <option value="1">24 giờ</option>
-            <option value="3">3 ngày</option>
-            <option value="7">7 ngày</option>
-            <option value="custom">Tùy chỉnh...</option>
-          </select>
-        </label>
-        <span id="custom-range-inputs" style="display:none; align-items:center; gap:8px;">
-          <label class="inline-select">Từ:
-            <input type="datetime-local" id="custom-start">
-          </label>
-          <label class="inline-select">Đến:
-            <input type="datetime-local" id="custom-end">
-          </label>
-          <button id="btn-apply-custom-range" class="tool-btn primary" type="button">Áp dụng</button>
-        </span>
-      </div>
+  <div class="analytics-card">
+    <h3>Lưu lượng xe theo loại &amp; Vi phạm theo giờ</h3>
+
+    <div class="time-filter-bar">
+      <label>Khoảng thời gian:
+        <select id="days-select">
+          <option value="1">24 giờ</option>
+          <option value="3">3 ngày</option>
+          <option value="7">7 ngày</option>
+          <option value="custom">Tùy chỉnh...</option>
+        </select>
+      </label>
+      <span id="custom-range-inputs">
+        <label>Từ: <input type="datetime-local" id="custom-start"></label>
+        <label>Đến: <input type="datetime-local" id="custom-end"></label>
+        <button id="btn-apply-custom-range" class="tool-btn primary" type="button">Áp dụng</button>
+      </span>
+
+      <!-- ==== NÚT XUẤT BÁO CÁO (mới thêm) ==== -->
+      <button id="btn-export-docx" class="tool-btn" type="button">📄 Xuất Word</button>
+      <button id="btn-export-xlsx" class="tool-btn" type="button">📊 Xuất Excel</button>
+      <span id="export-status"></span>
+      <!-- ==== HẾT PHẦN MỚI THÊM ==== -->
     </div>
-    <canvas id="chart-combined" height="85"></canvas>
+
+    <div id="filter-error"></div>
+
+    <canvas id="chart-combined" height="80"></canvas>
 
     <div class="analytics-table-wrap">
       <table class="detail-table" id="detail-table">
-        <thead>
-          <tr id="detail-table-head">
-            <th>Thời điểm</th>
-          </tr>
-        </thead>
+        <thead><tr id="detail-table-head"><th>Thời điểm</th></tr></thead>
         <tbody id="detail-table-body"></tbody>
         <tfoot id="detail-table-foot"></tfoot>
       </table>
@@ -168,18 +163,10 @@
 </main>
 
 <script>
-const classColors = {
-  car: '#4fd1c5',
-  truck: '#ecc94b',
-  bus: '#63b3ed',
-  motorbike: '#b794f4'
-};
-const classLabelsVi = {
-  car: 'Ô tô con',
-  truck: 'Xe tải',
-  bus: 'Xe buýt',
-  motorbike: 'Xe máy'
-};
+Chart.register(ChartDataLabels);
+
+const classColors = { car: '#4fd1c5', truck: '#ecc94b', bus: '#63b3ed', motorbike: '#b794f4' };
+const classLabelsVi = { car: 'Ô tô con', truck: 'Xe tải', bus: 'Xe buýt', motorbike: 'Xe máy' };
 const violationColor = '#f56565';
 
 Chart.defaults.color = '#9aa4b8';
@@ -188,33 +175,62 @@ Chart.defaults.font.family = "'Segoe UI', system-ui, sans-serif";
 
 async function fetchJSON(url) {
   const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
+}
+
+function showError(msg) {
+  const el = document.getElementById('filter-error');
+  if (!msg) { el.style.display = 'none'; el.textContent = ''; return; }
+  el.style.display = 'block';
+  el.textContent = msg;
 }
 
 let combinedChart;
 
 function fmtHour(h) {
-  // "2026-08-18 08:00" -> "18/08 08:00"
   const [datePart, timePart] = h.split(' ');
   const [y, m, d] = datePart.split('-');
   return `${d}/${m} ${timePart}`;
 }
 
+function pad(n) { return String(n).padStart(2, '0'); }
+function toDatetimeLocalValue(d) {
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 function buildQueryString() {
   const mode = document.getElementById('days-select').value;
   if (mode === 'custom') {
-    const start = document.getElementById('custom-start').value;   // "2026-08-18T08:00"
-    const end = document.getElementById('custom-end').value;
-    if (!start || !end) return null; // chưa chọn đủ, chưa gọi API
-    return `start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
+    const startVal = document.getElementById('custom-start').value;
+    const endVal = document.getElementById('custom-end').value;
+    if (!startVal || !endVal) {
+      showError('Vui lòng chọn đủ cả "Từ" và "Đến" rồi bấm Áp dụng.');
+      return null;
+    }
+    if (startVal >= endVal) {
+      showError('Thời điểm "Từ" phải sớm hơn thời điểm "Đến".');
+      return null;
+    }
+    showError(null);
+    return `start=${encodeURIComponent(startVal)}&end=${encodeURIComponent(endVal)}`;
   }
+  showError(null);
   return `days=${mode}`;
 }
 
 async function renderCombined() {
   const qs = buildQueryString();
-  if (qs === null) return; // đang ở chế độ tùy chỉnh nhưng chưa chọn đủ từ/đến
-  const data = await fetchJSON(`/api/analytics/combined?${qs}`);
+  if (qs === null) return;
+
+  let data;
+  try {
+    data = await fetchJSON(`/api/analytics/combined?${qs}`);
+  } catch (e) {
+    showError('Không tải được dữ liệu từ server. Kiểm tra lại kết nối hoặc thử lại.');
+    console.error(e);
+    return;
+  }
 
   const allHours = [...new Set([
     ...data.traffic_by_class.map(d => d.hour_bucket),
@@ -230,7 +246,6 @@ async function renderCombined() {
 
   const violationMap = Object.fromEntries(data.violations.map(d => [d.hour_bucket, d.total]));
 
-  // ---- Vẽ chart ----
   const datasets = classes.map(c => ({
     type: 'bar',
     label: classLabelsVi[c] || c,
@@ -238,20 +253,46 @@ async function renderCombined() {
     backgroundColor: classColors[c] || '#8895ab',
     borderRadius: 4,
     stack: 'traffic',
-    yAxisID: 'yTraffic'
+    yAxisID: 'yTraffic',
+    datalabels: { display: false }
   }));
 
+  const totalPerHour = allHours.map(h => classes.reduce((s, c) => s + (classMap[c][h] || 0), 0));
   datasets.push({
-    type: 'line',
+    type: 'bar',
+    label: 'Tổng xe',
+    data: allHours.map(() => 0),
+    backgroundColor: 'transparent',
+    stack: 'traffic',
+    yAxisID: 'yTraffic',
+    datalabels: {
+      display: true,
+      anchor: 'end',
+      align: 'end',
+      offset: 6,
+      color: '#e8ecf4',
+      font: { weight: '700', size: 13 },
+      formatter: (_, ctx) => totalPerHour[ctx.dataIndex] || ''
+    }
+  });
+
+  datasets.push({
+    type: 'bar',
     label: 'Vi phạm',
     data: allHours.map(h => violationMap[h] || 0),
-    borderColor: violationColor,
     backgroundColor: violationColor,
-    pointBackgroundColor: violationColor,
-    pointRadius: 4,
+    borderRadius: 4,
+    stack: 'violation',
     yAxisID: 'yViolation',
-    tension: 0.35,
-    borderWidth: 2.5
+    datalabels: {
+      display: true,
+      anchor: 'end',
+      align: 'end',
+      offset: 4,
+      color: violationColor,
+      font: { weight: '700', size: 12 },
+      formatter: (v) => v > 0 ? v : ''
+    }
   });
 
   if (combinedChart) combinedChart.destroy();
@@ -262,17 +303,21 @@ async function renderCombined() {
       responsive: true,
       interaction: { mode: 'index', intersect: false },
       plugins: {
-        legend: { position: 'top', labels: { usePointStyle: true, boxWidth: 8, padding: 16 } },
+        legend: {
+          position: 'top',
+          labels: {
+            usePointStyle: true, boxWidth: 8, padding: 16,
+            filter: (item) => item.text !== 'Tổng xe'
+          }
+        },
         tooltip: {
-          backgroundColor: '#0f1420',
-          borderColor: '#2a3145',
-          borderWidth: 1,
-          padding: 10,
+          backgroundColor: '#0f1420', borderColor: '#2a3145', borderWidth: 1, padding: 10,
           titleFont: { weight: '600' },
+          filter: (item) => item.dataset.label !== 'Tổng xe',
           callbacks: {
             footer: (items) => {
               const total = items
-                .filter(i => i.dataset.yAxisID === 'yTraffic')
+                .filter(i => i.dataset.yAxisID === 'yTraffic' && i.dataset.label !== 'Tổng xe')
                 .reduce((s, i) => s + i.parsed.y, 0);
               return `Tổng xe: ${total}`;
             }
@@ -285,7 +330,8 @@ async function renderCombined() {
           stacked: true, position: 'left', beginAtZero: true,
           ticks: { precision: 0 },
           title: { display: true, text: 'Số xe', color: '#8895ab' },
-          grid: { color: '#1e2536' }
+          grid: { color: '#1e2536' },
+          grace: '10%'
         },
         yViolation: {
           position: 'right', beginAtZero: true,
@@ -297,7 +343,6 @@ async function renderCombined() {
     }
   });
 
-  // ---- Bảng chi tiết ----
   const thead = document.getElementById('detail-table-head');
   thead.innerHTML = '<th>Thời điểm</th>' +
     classes.map(c => `<th>${classLabelsVi[c] || c}</th>`).join('') +
@@ -307,18 +352,17 @@ async function renderCombined() {
   if (allHours.length === 0) {
     tbody.innerHTML = `<tr><td colspan="${classes.length + 3}" style="text-align:center;color:#6b7488;">Chưa có dữ liệu</td></tr>`;
   } else {
-    tbody.innerHTML = allHours.map(h => {
-      const rowTotal = classes.reduce((s, c) => s + (classMap[c][h] || 0), 0);
+    tbody.innerHTML = allHours.map((h, idx) => {
       return '<tr>' +
         `<td>${fmtHour(h)}</td>` +
         classes.map(c => `<td>${classMap[c][h] || 0}</td>`).join('') +
-        `<td class="total-col">${rowTotal}</td>` +
+        `<td class="total-col">${totalPerHour[idx]}</td>` +
         `<td class="violation-col">${violationMap[h] || 0}</td>` +
         '</tr>';
     }).join('');
   }
 
-  const grandTraffic = classes.reduce((s, c) => s + Object.values(classMap[c]).reduce((a, b) => a + b, 0), 0);
+  const grandTraffic = totalPerHour.reduce((a, b) => a + b, 0);
   const grandViolations = Object.values(violationMap).reduce((a, b) => a + b, 0);
   const tfoot = document.getElementById('detail-table-foot');
   tfoot.innerHTML = '<tr>' +
@@ -328,20 +372,15 @@ async function renderCombined() {
     `<td class="violation-col">${grandViolations}</td>` +
     '</tr>';
 
-  // ---- Thẻ tổng quan ----
   document.getElementById('stat-total-traffic').textContent = grandTraffic;
-  document.getElementById('stat-total-traffic-sub').textContent =
-    `${classes.length} loại xe · ${allHours.length} mốc giờ`;
+  document.getElementById('stat-total-traffic-sub').textContent = `${classes.length} loại xe · ${allHours.length} mốc giờ`;
 
   document.getElementById('stat-total-violations').textContent = grandViolations;
   const rate = grandTraffic > 0 ? ((grandViolations / grandTraffic) * 100).toFixed(1) : '0.0';
   document.getElementById('stat-violation-rate').textContent = `${rate}% trên tổng lượt xe`;
 
   let peakHour = '–', peakVal = -1;
-  allHours.forEach(h => {
-    const total = classes.reduce((s, c) => s + (classMap[c][h] || 0), 0);
-    if (total > peakVal) { peakVal = total; peakHour = h; }
-  });
+  allHours.forEach((h, idx) => { if (totalPerHour[idx] > peakVal) { peakVal = totalPerHour[idx]; peakHour = h; } });
   document.getElementById('stat-peak-hour').textContent = peakHour !== '–' ? fmtHour(peakHour) : '–';
   document.getElementById('stat-peak-hour-sub').textContent = peakVal >= 0 ? `${peakVal} xe` : '\u00a0';
 
@@ -360,22 +399,94 @@ const customRangeInputs = document.getElementById('custom-range-inputs');
 daysSelect.addEventListener('change', () => {
   if (daysSelect.value === 'custom') {
     customRangeInputs.style.display = 'inline-flex';
-    // gợi ý mặc định: 24h gần nhất, để người dùng chỉnh lại theo ý
     const now = new Date();
     const yesterday = new Date(now.getTime() - 24 * 3600 * 1000);
-    const toLocalInput = (d) => {
-      const pad = n => String(n).padStart(2, '0');
-      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-    };
-    document.getElementById('custom-start').value = toLocalInput(yesterday);
-    document.getElementById('custom-end').value = toLocalInput(now);
+    document.getElementById('custom-start').value = toDatetimeLocalValue(yesterday);
+    document.getElementById('custom-end').value = toDatetimeLocalValue(now);
+    showError(null);
   } else {
     customRangeInputs.style.display = 'none';
+    showError(null);
     renderCombined();
   }
 });
 
 document.getElementById('btn-apply-custom-range').addEventListener('click', renderCombined);
+
+// ==== PHẦN MỚI THÊM: XUẤT BÁO CÁO WORD / EXCEL ====
+
+function resolveTimeRangeForExport() {
+  const mode = document.getElementById('days-select').value;
+
+  if (mode === 'custom') {
+    const startVal = document.getElementById('custom-start').value;
+    const endVal = document.getElementById('custom-end').value;
+    if (!startVal || !endVal) {
+      showError('Vui lòng chọn đủ cả "Từ" và "Đến" trước khi xuất báo cáo.');
+      return null;
+    }
+    return {
+      start_time: startVal.replace('T', ' ') + ':00',
+      end_time: endVal.replace('T', ' ') + ':00',
+    };
+  }
+
+  const days = parseInt(mode, 10);
+  const now = new Date();
+  const past = new Date(now.getTime() - days * 24 * 3600 * 1000);
+  const fmt = (d) =>
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+
+  return { start_time: fmt(past), end_time: fmt(now) };
+}
+
+async function exportReport(format) {
+  const btn = document.getElementById(format === 'docx' ? 'btn-export-docx' : 'btn-export-xlsx');
+  const status = document.getElementById('export-status');
+
+  const range = resolveTimeRangeForExport();
+  if (!range) return;
+
+  showError(null);
+  btn.disabled = true;
+  status.textContent = 'Đang tạo báo cáo (có gọi AI nên mất khoảng 5-15 giây)...';
+
+  try {
+    const res = await fetch(`/api/export_report/${format}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(range),
+    });
+
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || `HTTP ${res.status}`);
+    }
+
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = format === 'docx' ? 'BaoCao_PhanTich.docx' : 'BaoCao_PhanTich.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+
+    status.textContent = 'Xuất báo cáo thành công!';
+  } catch (err) {
+    status.textContent = '';
+    showError('Lỗi khi xuất báo cáo: ' + err.message);
+    console.error(err);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+document.getElementById('btn-export-docx').addEventListener('click', () => exportReport('docx'));
+document.getElementById('btn-export-xlsx').addEventListener('click', () => exportReport('xlsx'));
+
+// ==== HẾT PHẦN MỚI THÊM ====
 
 renderCombined();
 </script>

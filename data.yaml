@@ -1,0 +1,14 @@
+# Cau hinh dataset cho YOLO train - dat file nay o thu muc goc project
+# (cung cap voi train.py), duong dan ben duoi la duong dan TUONG DOI tinh
+# tu vi tri file data.yaml nay.
+
+path: dataset          # thư mục gốc chứa images/ và labels/
+train: images/train    # dataset/images/train
+val: images/val        # dataset/images/val
+
+nc: 4                  # số lớp (car, motorbike, bus, truck)
+names:
+  0: car
+  1: motorbike
+  2: bus
+  3: truck

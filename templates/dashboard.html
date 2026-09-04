@@ -53,7 +53,7 @@
           </select>
         </label>
         <button id="btn-add-line" class="tool-btn">➕ Thêm Line</button>
-        <button id="btn-save-roi" class="tool-btn">💾 Lưu ROI (4 điểm)</button>
+        <button id="btn-save-roi" class="tool-btn">💾 Lưu ROI (đã vẽ)</button>
         <button id="btn-undo" class="tool-btn">↩ Hoàn tác</button>
         <button id="btn-clear" class="tool-btn danger">🗑 Xóa hết</button>
         <button id="btn-save-config" class="tool-btn primary">✔ Lưu cấu hình</button>
@@ -212,6 +212,7 @@ let lines = [];       // [{p1:{x,y}, p2:{x,y}, direction:"in"}]
 let roiZones = [];     // [[{x,y}x4], ...]
 let currentROI = [];
 let selLine = null, selPt = null, selROI = null, dragOx = 0, dragOy = 0;
+let isDrawingROI = false;
 const LINE_COLORS = ["#4fd1c5", "#f56565", "#ecc94b", "#63b3ed", "#b794f4"];
 
 function loadPreviewFrame() {
@@ -257,14 +258,16 @@ function redrawCanvas() {
 
   if (currentROI.length) {
     ctx.strokeStyle = "#ecc94b"; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(currentROI[0].x, currentROI[0].y);
+    ctx.beginPath();
+    ctx.moveTo(currentROI[0].x, currentROI[0].y);
     for (let k = 1; k < currentROI.length; k++) ctx.lineTo(currentROI[k].x, currentROI[k].y);
-    if (currentROI.length === 4) ctx.lineTo(currentROI[0].x, currentROI[0].y); // nối điểm 4 về lại điểm 1
+    if (!isDrawingROI && currentROI.length >= 3) {
+      // Đã vẽ xong (thả chuột) -> khép kín vùng và tô nhẹ bên trong
+      ctx.closePath();
+      ctx.fillStyle = "rgba(236, 201, 75, .2)";
+      ctx.fill();
+    }
     ctx.stroke();
-    currentROI.forEach((p, i) => {
-      ctx.fillStyle = "#ecc94b"; ctx.beginPath(); ctx.arc(p.x, p.y, 7, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = "#000"; ctx.font = "11px Arial"; ctx.fillText(i + 1, p.x - 3, p.y + 4);
-    });
   }
 }
 
@@ -289,7 +292,7 @@ document.getElementById("btn-add-line").onclick = () => {
 };
 
 document.getElementById("btn-save-roi").onclick = () => {
-  if (currentROI.length !== 4) { configStatus.textContent = "Vùng ROI cần đúng 4 điểm."; return; }
+  if (currentROI.length < 3) { configStatus.textContent = "Vui lòng rê chuột vẽ vùng ROI trước khi lưu."; return; }
   roiZones.push([...currentROI]);
   currentROI = [];
   configStatus.textContent = "";
@@ -311,13 +314,6 @@ document.getElementById("btn-clear").onclick = () => {
   redrawCanvas();
 };
 
-canvas.onclick = (e) => {
-  if (drawModeSel.value === "roi" && currentROI.length < 4) {
-    currentROI.push(canvasPos(e));
-    redrawCanvas();
-  }
-};
-
 canvas.onmousedown = (e) => {
   const { x, y } = canvasPos(e);
   selLine = selPt = selROI = null;
@@ -327,17 +323,21 @@ canvas.onmousedown = (e) => {
       else if (dist(x, y, l.p2.x, l.p2.y) < 12) { selLine = l; selPt = "p2"; }
     });
   } else {
+    // Ưu tiên: nếu bấm trúng 1 điểm của ROI đã lưu -> kéo chỉnh điểm đó
+    // (giữ nguyên tính năng chỉnh sửa cũ), ngược lại -> bắt đầu vẽ freehand mới.
+    let hitExisting = false;
     roiZones.forEach((roi, ri) => roi.forEach((p, pi) => {
-      if (dist(x, y, p.x, p.y) < 12) selROI = { saved: true, ri, pi };
+      if (dist(x, y, p.x, p.y) < 12) { selROI = { saved: true, ri, pi }; hitExisting = true; }
     }));
-    currentROI.forEach((p, pi) => {
-      if (dist(x, y, p.x, p.y) < 12) selROI = { saved: false, pi };
-    });
+    if (!hitExisting) {
+      isDrawingROI = true;
+      currentROI = [{ x, y }];
+    }
   }
 };
 
 canvas.onmousemove = (e) => {
-  if (!selLine && !selROI) return;
+  if (!selLine && !selROI && !isDrawingROI) return;
   const { x, y } = canvasPos(e);
   if (selLine) {
     if (selPt === "p1") selLine.p1 = { x, y };
@@ -349,9 +349,28 @@ canvas.onmousemove = (e) => {
     else currentROI[selROI.pi] = { x, y };
     redrawCanvas();
   }
+  if (isDrawingROI) {
+    // Chỉ thêm điểm mới nếu đã di đủ xa điểm trước đó (tránh quá nhiều
+    // điểm trùng lặp khi rê chuột chậm) - lấy mẫu ~6px một điểm.
+    const last = currentROI[currentROI.length - 1];
+    if (dist(x, y, last.x, last.y) > 6) {
+      currentROI.push({ x, y });
+      redrawCanvas();
+    }
+  }
 };
 
-canvas.onmouseup = () => { selLine = selPt = selROI = null; };
+canvas.onmouseup = () => {
+  if (isDrawingROI) {
+    isDrawingROI = false;
+    if (currentROI.length < 3) {
+      // Vẽ chưa đủ để tạo thành vùng kín (chỉ click chuột không rê) -> bỏ
+      currentROI = [];
+    }
+    redrawCanvas();
+  }
+  selLine = selPt = selROI = null;
+};
 
 document.getElementById("btn-save-config").onclick = async () => {
   configStatus.textContent = "Đang lưu...";

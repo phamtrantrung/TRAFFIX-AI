@@ -6,7 +6,7 @@ from collections import defaultdict
 from ultralytics import YOLO
 
 import globals as G
-from utils.geometry import point_in_roi, side_of_line
+from utils.geometry import point_in_roi, side_of_line, point_projects_onto_segment
 from utils.drawing import draw_lines, draw_roi, draw_stats, draw_roi_count
 from utils.violation_engine import ViolationEngine
 from utils.behavior_analysis import BehaviorAnalyzer
@@ -14,7 +14,13 @@ from utils.license_plate import PlateReader
 from utils import database
 
 # ---- CẤU HÌNH ----
-VEHICLE_MODEL_PATH = "models/yolov8n.pt"          # model detect xe (đã có sẵn)
+# FIX (nhầm truck/bus): yolov8n (nano) la ban nhe nhat, nhanh nhung do
+# chinh xac phan loai xe co lon (truck/bus) thap, de nham lan - dac biet
+# voi xe tai/xe khach VN co hinh dang khac tap COCO goc. Doi sang yolov8s
+# (small) de tang do chinh xac phan loai, danh doi toc do cham hon mot
+# chut (van chay tot real-time). Neu may chua co file nay, Ultralytics se
+# TU DONG TAI VE tu internet trong lan chay dau tien (~22MB) - can mang.
+VEHICLE_MODEL_PATH = "models/yolov8s.pt"          # model detect xe (tu dong tai neu chua co)
 PLATE_MODEL_PATH = "models/plate_yolov8n.pt"       # model detect biển số (cần train riêng)
 LOCATION_NAME = "CAM_NGA_TU_01"
 VEHICLE_CLASSES = {2: "car", 3: "motorbike", 5: "bus", 7: "truck"}  # theo COCO id, chỉnh lại nếu model custom
@@ -58,6 +64,31 @@ def run(video_source, enable_plate_reading=True):
     counted_crossings = set()  # (track_id, line_idx) đã đếm rồi, tránh đếm trùng
     prev_side_map = {}  # (track_id, line_idx) -> giá trị side_of_line ở frame trước
 
+    # FIX (nhãn LINE n hiện trễ): trước đây line_stats[line_idx] chỉ được
+    # tạo entry khi có xe ĐẦU TIÊN cắt qua line đó, nên overlay "LINE n"
+    # chỉ hiện lên sau khi có xe qua (line nào ít xe qua sẽ hiện rất trễ,
+    # thậm chí không hiện nếu chưa có xe nào qua). Khởi tạo sẵn entry cho
+    # TẤT CẢ các line đã cấu hình ngay từ đầu, để nhãn hiện ngay lập tức
+    # (bắt đầu ở trạng thái rỗng/0), không phải đợi có xe cắt qua.
+    for line_idx in range(len(G.lines)):
+        _ = line_stats[line_idx]  # chạm vào defaultdict để tạo entry rỗng
+
+    # FIX (đếm sai loại xe car/truck/bus): trước đây class được ghi nhận
+    # chỉ dựa vào 1 frame duy nhất - đúng lúc xe cắt qua line. YOLO không
+    # phân loại đúng 100% mọi frame (có thể nhận nhầm class ở 1-2 frame
+    # thoáng qua do góc nhìn/che khuất), nên nếu đúng lúc đó xe cắt line
+    # thì sẽ ghi nhận nhầm loại xe, dù đa số các frame khác phân loại
+    # đúng. Sửa: gom phiếu bầu class theo từng track_id qua toàn bộ các
+    # frame đã thấy, khi cắt line thì lấy class xuất hiện NHIỀU NHẤT
+    # (majority vote) thay vì class của đúng frame đó -> ổn định hơn.
+    track_class_votes = defaultdict(lambda: defaultdict(int))  # track_id -> {class_name: count}
+
+    def majority_class(track_id, fallback):
+        votes = track_class_votes.get(track_id)
+        if not votes:
+            return fallback
+        return max(votes.items(), key=lambda kv: kv[1])[0]
+
     frame_idx = 0
     prev_time = time.time()
 
@@ -73,8 +104,16 @@ def run(video_source, enable_plate_reading=True):
         frame_idx += 1
 
         # --- TRACKING ---
-        # persist=True để YOLO giữ track ID xuyên suốt các frame (dùng ByteTrack mặc định)
-        results = vehicle_model.track(frame, persist=True, verbose=False)
+        # persist=True để YOLO giữ track ID xuyên suốt các frame.
+        # FIX (đi qua line nhưng không đếm): dùng tracker config riêng
+        # (custom_bytetrack.yaml) với track_buffer tăng lên 90 (mặc định
+        # 30) - giảm tình trạng track bị đổi ID giữa chừng khi xe bị che
+        # khuất thoáng qua đúng lúc cắt line, vốn làm mất lượt đếm đó do
+        # hệ thống lưu "phía nào của line" theo track_id.
+        results = vehicle_model.track(
+            frame, persist=True, verbose=False, tracker="custom_bytetrack.yaml",
+            imgsz=1280
+        )
 
         if results[0].boxes.id is not None:
             boxes = results[0].boxes.xyxy.cpu().numpy()
@@ -83,8 +122,22 @@ def run(video_source, enable_plate_reading=True):
 
             for bbox, track_id, cls_id in zip(boxes, track_ids, class_ids):
                 cls_name = VEHICLE_CLASSES.get(cls_id, "unknown")
+
+                # FIX: bo qua hoan toan vat the KHONG phai xe (nguoi, den
+                # giao thong, v.v. - YOLO van detect va track nhung khong
+                # nam trong VEHICLE_CLASSES). Truoc day van dem qua line/
+                # ghi vao DB voi ten "unknown", lam ban du lieu thong ke va
+                # hien thi sai tren bieu do Phan tich. He thong nay chi
+                # quan tam xe co gioi, nen bo qua tu day, khong xu ly tiep
+                # cho track nay o frame nay.
+                if cls_name == "unknown":
+                    continue
+
                 x1, y1, x2, y2 = bbox
                 cx, cy = (x1 + x2) / 2, (y1 + y2) / 2
+
+                # Cộng dồn phiếu bầu class cho track_id này
+                track_class_votes[track_id][cls_name] += 1
 
                 # --- ĐẾM XE QUA LINE (thống kê lưu lượng, không dùng cho vi phạm) ---
                 for line_idx, line in enumerate(G.lines):
@@ -98,11 +151,15 @@ def run(video_source, enable_plate_reading=True):
 
                     crossing_key = (track_id, line_idx)
                     if (prev_side is not None and prev_side * side < 0
-                            and crossing_key not in counted_crossings):
+                            and crossing_key not in counted_crossings
+                            and point_projects_onto_segment((cx, cy), a, b)):
                         counted_crossings.add(crossing_key)
-                        line_stats[line_idx][cls_name] += 1
+                        # Dùng class xuất hiện nhiều nhất trong lịch sử track
+                        # (majority vote) thay vì class của riêng frame này
+                        counted_cls_name = majority_class(track_id, cls_name)
+                        line_stats[line_idx][counted_cls_name] += 1
                         database.insert_traffic_stat(
-                            LOCATION_NAME, str(line_idx), cls_name,
+                            LOCATION_NAME, str(line_idx), counted_cls_name,
                             line.get("direction", "in")
                         )
 
@@ -132,7 +189,12 @@ def run(video_source, enable_plate_reading=True):
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
 
             # Dọn dẹp lịch sử các track_id không còn xuất hiện trong frame này
-            behavior_analyzer.cleanup(set(track_ids.tolist()))
+            active_ids = set(track_ids.tolist())
+            behavior_analyzer.cleanup(active_ids)
+            # Dọn phiếu bầu class của các track_id đã biến mất, tránh rò rỉ bộ nhớ
+            for tid in list(track_class_votes.keys()):
+                if tid not in active_ids:
+                    del track_class_votes[tid]
 
         # --- VẼ OVERLAY ---
         draw_lines(frame, G.lines)

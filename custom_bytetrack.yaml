@@ -1,0 +1,12 @@
+# Custom ByteTrack config - tang track_buffer de giam ID switch khi xe
+# bi che khuat thoang qua (vd: qua cot den, cot bien, xe khac che, hoac
+# o ria khung hinh xa camera). Mac dinh Ultralytics dung track_buffer=30,
+# tang len 90 de tracker giu "hy vong" track cu lau hon truoc khi bo va
+# tao ID moi - giam tinh trang mat dem xe qua line do doi ID giua chung.
+tracker_type: bytetrack
+track_high_thresh: 0.5
+track_low_thresh: 0.1
+new_track_thresh: 0.45
+track_buffer: 90
+match_thresh: 0.8
+fuse_score: True

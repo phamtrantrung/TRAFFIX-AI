@@ -7,3 +7,6 @@ evidence/
 data/*.db
 models/*.pt
 .env
+archives/*.json
+reports/
+dataset/

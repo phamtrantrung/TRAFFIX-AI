@@ -4,8 +4,9 @@ import numpy as np
 
 
 def point_in_roi(point, polygon):
-    """Kiểm tra một điểm có nằm trong vùng ROI (đa giác 4 điểm) hay không."""
-    if len(polygon) != 4:
+    """Kiểm tra một điểm có nằm trong vùng ROI (đa giác bất kỳ, từ 3 điểm
+    trở lên - hỗ trợ cả ROI vẽ tự do freehand) hay không."""
+    if len(polygon) < 3:
         return False
 
     pts = np.array(
@@ -65,3 +66,18 @@ def point_on_segment(p, a, b):
     max_y = max(ay, by) + 10
 
     return (min_x <= px <= max_x) and (min_y <= py <= max_y)
+
+
+def point_projects_onto_segment(p, a, b, tolerance=0.05):
+    """Kiểm tra điểm p có chiếu vuông góc rơi vào TRONG đoạn thẳng a-b hay
+    không (không tính phần đường thẳng kéo dài vô hạn). tolerance là biên
+    nới lỏng 2 đầu đoạn (theo tỉ lệ t, 0-1), tránh bỏ sót các trường hợp
+    xe cắt sát ngay đầu mút line."""
+    ax, ay = a
+    bx, by = b
+    line_len_sq = (bx - ax) ** 2 + (by - ay) ** 2
+    if line_len_sq == 0:
+        return False
+
+    t = ((p[0] - ax) * (bx - ax) + (p[1] - ay) * (by - ay)) / line_len_sq
+    return -tolerance <= t <= 1 + tolerance

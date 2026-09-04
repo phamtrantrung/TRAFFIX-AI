@@ -135,21 +135,35 @@ def insert_violation(track_id, plate_number, plate_confidence, violation_type,
 
 
 def insert_traffic_stat(location, line_id, vehicle_class, direction):
+    # FIX (lệch múi giờ): trước đây câu INSERT không truyền timestamp,
+    # nên SQLite tự dùng DEFAULT CURRENT_TIMESTAMP của cột - giá trị này
+    # luôn là giờ UTC, KHÔNG phải giờ local máy chạy (VN = UTC+7). Trong
+    # khi đó insert_violation()/insert_behavior_event() đều truyền tường
+    # minh datetime.now() (giờ local), nên timestamp của traffic_stats bị
+    # lệch ~7 tiếng so với violations/behavior_events. Hậu quả: lọc báo
+    # cáo/trang Phân tích theo khoảng giờ local sẽ bỏ sót gần hết dữ liệu
+    # traffic_stats thật (chúng nằm ở mốc giờ UTC khác hẳn), dù xe đã
+    # thực sự đi qua line đúng lúc đó. Sửa: truyền tường minh datetime.now()
+    # giống 2 hàm insert kia, để cả 3 bảng dùng chung 1 chuẩn giờ local.
     with get_connection() as conn:
         conn.execute(
-            """INSERT INTO traffic_stats (location, line_id, vehicle_class, direction, count)
-               VALUES (?, ?, ?, ?, 1)""",
-            (location, line_id, vehicle_class, direction)
+            """INSERT INTO traffic_stats
+               (location, line_id, vehicle_class, direction, count, timestamp)
+               VALUES (?, ?, ?, ?, 1, ?)""",
+            (location, line_id, vehicle_class, direction, datetime.now())
         )
         conn.commit()
 
 
 def insert_roi_occupancy(location, roi_id, vehicle_count):
+    # FIX (lệch múi giờ): lỗi y hệt insert_traffic_stat() ở trên - trước
+    # đây không truyền timestamp nên bị SQLite tự gán giờ UTC thay vì
+    # giờ local, gây lệch dữ liệu khi lọc theo khoảng thời gian local.
     with get_connection() as conn:
         conn.execute(
-            """INSERT INTO roi_occupancy (location, roi_id, vehicle_count)
-               VALUES (?, ?, ?)""",
-            (location, roi_id, vehicle_count)
+            """INSERT INTO roi_occupancy (location, roi_id, vehicle_count, timestamp)
+               VALUES (?, ?, ?, ?)""",
+            (location, roi_id, vehicle_count, datetime.now())
         )
         conn.commit()
 
@@ -177,12 +191,29 @@ def get_recent_behavior_events(limit=50):
 
 # --- Truy vấn phục vụ trang Phân tích (Analytics) trên dashboard ---
 
+def _normalize_datetime_local(value):
+    """Chuẩn hóa giá trị từ <input type="datetime-local"> (dạng
+    '2026-08-18T14:44', dùng chữ 'T', không có giây) về đúng định dạng
+    SQLite đang lưu trong cột timestamp (dùng dấu cách, có giây - vd
+    '2026-08-18 14:44:00'). Nếu không chuẩn hóa, so sánh chuỗi giữa 2
+    định dạng khác nhau ('T' vs dấu cách) sẽ cho kết quả SAI (do 'T' có
+    mã ASCII lớn hơn dấu cách, làm lệch thứ tự so sánh)."""
+    if not value:
+        return value
+    value = value.replace("T", " ")
+    if len(value) == 16:  # "YYYY-MM-DD HH:MM" - thiếu giây
+        value += ":00"
+    return value
+
+
 def _time_filter_clause(days_back, start, end):
     """Trả về (sql_clause, params) dùng chung cho các hàm thống kê theo giờ.
     Nếu có start/end (chuỗi ISO datetime, vd '2026-08-18T08:00') thì ưu
     tiên lọc theo khoảng đó; nếu không thì lọc theo N ngày gần nhất
     (days_back) như cũ."""
     if start and end:
+        start = _normalize_datetime_local(start)
+        end = _normalize_datetime_local(end)
         return "timestamp >= ? AND timestamp <= ?", (start, end)
     return f"timestamp >= datetime('now', '-{int(days_back)} days')", ()
 

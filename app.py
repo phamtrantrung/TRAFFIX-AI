@@ -4,11 +4,11 @@ import time
 import threading
 import cv2
 from werkzeug.utils import secure_filename
-from flask import Flask, render_template, Response, request, jsonify, send_from_directory
-
+from flask import Flask, render_template, Response, request, jsonify, send_from_directory, send_file
 import globals as G
 from utils import database
 from utils import chatbot_engine
+from utils import report_generator
 import main as video_main
 
 app = Flask(__name__)
@@ -255,6 +255,35 @@ def api_chatbot():
     result = chatbot_engine.ask(question)
     return jsonify(result)
 
+@app.route("/api/export_report/docx", methods=["POST"])
+def export_report_docx():
+    payload = request.get_json(silent=True) or {}
+    start_time = payload.get("start_time")
+    end_time = payload.get("end_time")
 
+    if not start_time or not end_time:
+        return jsonify({"error": "Thiếu start_time hoặc end_time"}), 400
+
+    try:
+        file_path = report_generator.generate_docx_report(start_time, end_time)
+        return send_file(file_path, as_attachment=True)
+    except Exception as e:
+        return jsonify({"error": f"Không thể tạo báo cáo: {e}"}), 500
+
+
+@app.route("/api/export_report/xlsx", methods=["POST"])
+def export_report_xlsx():
+    payload = request.get_json(silent=True) or {}
+    start_time = payload.get("start_time")
+    end_time = payload.get("end_time")
+
+    if not start_time or not end_time:
+        return jsonify({"error": "Thiếu start_time hoặc end_time"}), 400
+
+    try:
+        file_path = report_generator.generate_xlsx_report(start_time, end_time)
+        return send_file(file_path, as_attachment=True)
+    except Exception as e:
+        return jsonify({"error": f"Không thể tạo báo cáo: {e}"}), 500
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True, threaded=True)
