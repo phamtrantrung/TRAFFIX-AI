@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Phân tích Giao thông</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
+<style>
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+  .stat-box {
+    background: #171d2e;
+    border: 1px solid #2a3145;
+    border-radius: 12px;
+    padding: 18px 20px;
+  }
+  .stat-box .stat-label { font-size: 13px; color: #9aa4b8; margin-bottom: 6px; }
+  .stat-box .stat-value { font-size: 28px; font-weight: 700; color: #e8ecf4; }
+  .stat-box .stat-value.accent-red { color: #f56565; }
+  .stat-box .stat-value.accent-teal { color: #4fd1c5; }
+  .stat-box .stat-sub { font-size: 12px; color: #6b7488; margin-top: 4px; }
+
+  /* Card chính - layout doc, khong con dung flex chung hang voi h3 nua
+     de tranh de/chong nhu truoc */
+  .analytics-card {
+    background: #171d2e;
+    border: 1px solid #2a3145;
+    border-radius: 12px;
+    padding: 22px;
+  }
+  .analytics-card h3 { margin: 0 0 16px 0; }
+
+  .time-filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    background: #10141f;
+    border: 1px solid #232a3d;
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-bottom: 20px;
+  }
+  .time-filter-bar label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: #9aa4b8;
+    white-space: nowrap;
+  }
+  .time-filter-bar select,
+  .time-filter-bar input[type="datetime-local"] {
+    background: #1b2236;
+    border: 1px solid #2a3145;
+    color: #e8ecf4;
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 13px;
+  }
+  #custom-range-inputs { display: none; align-items: center; gap: 12px; flex-wrap: wrap; }
+  #filter-error {
+    display: none;
+    color: #f56565;
+    font-size: 13px;
+    margin-bottom: 12px;
+  }
+
+  .analytics-table-wrap { overflow-x: auto; margin-top: 20px; }
+  table.detail-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  table.detail-table th, table.detail-table td {
+    padding: 10px 14px; text-align: right;
+    border-bottom: 1px solid #232a3d; white-space: nowrap;
+  }
+  table.detail-table th:first-child, table.detail-table td:first-child { text-align: left; }
+  table.detail-table thead th {
+    color: #9aa4b8; font-weight: 600; font-size: 12px;
+    text-transform: uppercase; letter-spacing: .03em;
+    border-bottom: 2px solid #2a3145;
+  }
+  table.detail-table tbody tr:hover { background: #1b2236; }
+  table.detail-table td.total-col { font-weight: 700; color: #e8ecf4; }
+  table.detail-table td.violation-col { color: #f56565; font-weight: 600; }
+  table.detail-table tfoot td { font-weight: 700; color: #e8ecf4; border-top: 2px solid #2a3145; border-bottom: none; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🚦 Hệ thống Giám sát &amp; Phạt nguội Giao thông</h1>
+  <nav>
+    <a href="/">Dashboard</a>
+    <a href="/analytics" class="active">Phân tích</a>
+    <a href="/chatbot">Trợ lý AI</a>
+  </nav>
+</header>
+
+<main class="analytics-layout">
+  <div class="stats-row">
+    <div class="stat-box">
+      <div class="stat-label">Tổng lượt xe</div>
+      <div class="stat-value accent-teal" id="stat-total-traffic">–</div>
+      <div class="stat-sub" id="stat-total-traffic-sub">&nbsp;</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">Tổng vi phạm</div>
+      <div class="stat-value accent-red" id="stat-total-violations">–</div>
+      <div class="stat-sub" id="stat-violation-rate">&nbsp;</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">Giờ cao điểm</div>
+      <div class="stat-value" id="stat-peak-hour">–</div>
+      <div class="stat-sub" id="stat-peak-hour-sub">&nbsp;</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">Loại xe phổ biến nhất</div>
+      <div class="stat-value" id="stat-top-class">–</div>
+      <div class="stat-sub" id="stat-top-class-sub">&nbsp;</div>
+    </div>
+  </div>
+
+  <div class="analytics-card">
+    <h3>Lưu lượng xe theo loại &amp; Vi phạm theo giờ</h3>
+
+    <div class="time-filter-bar">
+      <label>Khoảng thời gian:
+        <select id="days-select">
+          <option value="1">24 giờ</option>
+          <option value="3">3 ngày</option>
+          <option value="7">7 ngày</option>
+          <option value="custom">Tùy chỉnh...</option>
+        </select>
+      </label>
+      <span id="custom-range-inputs">
+        <label>Từ: <input type="datetime-local" id="custom-start"></label>
+        <label>Đến: <input type="datetime-local" id="custom-end"></label>
+        <button id="btn-apply-custom-range" class="tool-btn primary" type="button">Áp dụng</button>
+      </span>
+    </div>
+
+    <div id="filter-error"></div>
+
+    <canvas id="chart-combined" height="80"></canvas>
+
+    <div class="analytics-table-wrap">
+      <table class="detail-table" id="detail-table">
+        <thead><tr id="detail-table-head"><th>Thời điểm</th></tr></thead>
+        <tbody id="detail-table-body"></tbody>
+        <tfoot id="detail-table-foot"></tfoot>
+      </table>
+    </div>
+  </div>
+</main>
+
+<script>
+Chart.register(ChartDataLabels);
+
+const classColors = { car: '#4fd1c5', truck: '#ecc94b', bus: '#63b3ed', motorbike: '#b794f4' };
+const classLabelsVi = { car: 'Ô tô con', truck: 'Xe tải', bus: 'Xe buýt', motorbike: 'Xe máy' };
+const violationColor = '#f56565';
+
+Chart.defaults.color = '#9aa4b8';
+Chart.defaults.borderColor = '#232a3d';
+Chart.defaults.font.family = "'Segoe UI', system-ui, sans-serif";
+
+async function fetchJSON(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+function showError(msg) {
+  const el = document.getElementById('filter-error');
+  if (!msg) { el.style.display = 'none'; el.textContent = ''; return; }
+  el.style.display = 'block';
+  el.textContent = msg;
+}
+
+let combinedChart;
+
+function fmtHour(h) {
+  const [datePart, timePart] = h.split(' ');
+  const [y, m, d] = datePart.split('-');
+  return `${d}/${m} ${timePart}`;
+}
+
+function pad(n) { return String(n).padStart(2, '0'); }
+function toDatetimeLocalValue(d) {
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function buildQueryString() {
+  const mode = document.getElementById('days-select').value;
+  if (mode === 'custom') {
+    const startVal = document.getElementById('custom-start').value;
+    const endVal = document.getElementById('custom-end').value;
+    if (!startVal || !endVal) {
+      showError('Vui lòng chọn đủ cả "Từ" và "Đến" rồi bấm Áp dụng.');
+      return null;
+    }
+    if (startVal >= endVal) {
+      showError('Thời điểm "Từ" phải sớm hơn thời điểm "Đến".');
+      return null;
+    }
+    showError(null);
+    return `start=${encodeURIComponent(startVal)}&end=${encodeURIComponent(endVal)}`;
+  }
+  showError(null);
+  return `days=${mode}`;
+}
+
+async function renderCombined() {
+  const qs = buildQueryString();
+  if (qs === null) return;
+
+  let data;
+  try {
+    data = await fetchJSON(`/api/analytics/combined?${qs}`);
+  } catch (e) {
+    showError('Không tải được dữ liệu từ server. Kiểm tra lại kết nối hoặc thử lại.');
+    console.error(e);
+    return;
+  }
+
+  const allHours = [...new Set([
+    ...data.traffic_by_class.map(d => d.hour_bucket),
+    ...data.violations.map(d => d.hour_bucket)
+  ])].sort();
+
+  const classes = [...new Set(data.traffic_by_class.map(d => d.vehicle_class))]
+    .sort((a, b) => (classColors[a] ? 0 : 1) - (classColors[b] ? 0 : 1));
+
+  const classMap = {};
+  classes.forEach(c => classMap[c] = {});
+  data.traffic_by_class.forEach(d => { classMap[d.vehicle_class][d.hour_bucket] = d.total; });
+
+  const violationMap = Object.fromEntries(data.violations.map(d => [d.hour_bucket, d.total]));
+
+  const datasets = classes.map(c => ({
+    type: 'bar',
+    label: classLabelsVi[c] || c,
+    data: allHours.map(h => classMap[c][h] || 0),
+    backgroundColor: classColors[c] || '#8895ab',
+    borderRadius: 4,
+    stack: 'traffic',
+    yAxisID: 'yTraffic',
+    datalabels: { display: false }  // chỉ hiện tổng, không hiện từng phần nhỏ để đỡ rối
+  }));
+
+  // Dataset ảo để hiện TỔNG số xe ngay trên đỉnh mỗi cột (giống ảnh mẫu)
+  const totalPerHour = allHours.map(h => classes.reduce((s, c) => s + (classMap[c][h] || 0), 0));
+  datasets.push({
+    type: 'bar',
+    label: 'Tổng xe',
+    data: allHours.map(() => 0),  // cột cao 0, chỉ dùng để đặt label tổng
+    backgroundColor: 'transparent',
+    stack: 'traffic',
+    yAxisID: 'yTraffic',
+    datalabels: {
+      display: true,
+      anchor: 'end',
+      align: 'end',
+      offset: 6,
+      color: '#e8ecf4',
+      font: { weight: '700', size: 13 },
+      formatter: (_, ctx) => totalPerHour[ctx.dataIndex] || ''
+    }
+  });
+
+  datasets.push({
+    type: 'bar',
+    label: 'Vi phạm',
+    data: allHours.map(h => violationMap[h] || 0),
+    backgroundColor: violationColor,
+    borderRadius: 4,
+    stack: 'violation',
+    yAxisID: 'yViolation',
+    datalabels: {
+      display: true,
+      anchor: 'end',
+      align: 'end',
+      offset: 4,
+      color: violationColor,
+      font: { weight: '700', size: 12 },
+      formatter: (v) => v > 0 ? v : ''
+    }
+  });
+
+  if (combinedChart) combinedChart.destroy();
+  combinedChart = new Chart(document.getElementById('chart-combined'), {
+    type: 'bar',
+    data: { labels: allHours.map(fmtHour), datasets },
+    options: {
+      responsive: true,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: {
+          position: 'top',
+          labels: {
+            usePointStyle: true, boxWidth: 8, padding: 16,
+            filter: (item) => item.text !== 'Tổng xe' // ẩn dataset ảo khỏi chú thích
+          }
+        },
+        tooltip: {
+          backgroundColor: '#0f1420', borderColor: '#2a3145', borderWidth: 1, padding: 10,
+          titleFont: { weight: '600' },
+          filter: (item) => item.dataset.label !== 'Tổng xe',
+          callbacks: {
+            footer: (items) => {
+              const total = items
+                .filter(i => i.dataset.yAxisID === 'yTraffic' && i.dataset.label !== 'Tổng xe')
+                .reduce((s, i) => s + i.parsed.y, 0);
+              return `Tổng xe: ${total}`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: { stacked: true, ticks: { maxRotation: 45, minRotation: 45 }, grid: { display: false } },
+        yTraffic: {
+          stacked: true, position: 'left', beginAtZero: true,
+          ticks: { precision: 0 },
+          title: { display: true, text: 'Số xe', color: '#8895ab' },
+          grid: { color: '#1e2536' },
+          grace: '10%'
+        },
+        yViolation: {
+          position: 'right', beginAtZero: true,
+          ticks: { precision: 0 },
+          grid: { drawOnChartArea: false },
+          title: { display: true, text: 'Vi phạm', color: '#8895ab' }
+        }
+      }
+    }
+  });
+
+  // ---- Bảng chi tiết ----
+  const thead = document.getElementById('detail-table-head');
+  thead.innerHTML = '<th>Thời điểm</th>' +
+    classes.map(c => `<th>${classLabelsVi[c] || c}</th>`).join('') +
+    '<th>Tổng xe</th><th>Vi phạm</th>';
+
+  const tbody = document.getElementById('detail-table-body');
+  if (allHours.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="${classes.length + 3}" style="text-align:center;color:#6b7488;">Chưa có dữ liệu</td></tr>`;
+  } else {
+    tbody.innerHTML = allHours.map((h, idx) => {
+      return '<tr>' +
+        `<td>${fmtHour(h)}</td>` +
+        classes.map(c => `<td>${classMap[c][h] || 0}</td>`).join('') +
+        `<td class="total-col">${totalPerHour[idx]}</td>` +
+        `<td class="violation-col">${violationMap[h] || 0}</td>` +
+        '</tr>';
+    }).join('');
+  }
+
+  const grandTraffic = totalPerHour.reduce((a, b) => a + b, 0);
+  const grandViolations = Object.values(violationMap).reduce((a, b) => a + b, 0);
+  const tfoot = document.getElementById('detail-table-foot');
+  tfoot.innerHTML = '<tr>' +
+    '<td>Tổng cộng</td>' +
+    classes.map(c => `<td>${Object.values(classMap[c]).reduce((a, b) => a + b, 0)}</td>`).join('') +
+    `<td class="total-col">${grandTraffic}</td>` +
+    `<td class="violation-col">${grandViolations}</td>` +
+    '</tr>';
+
+  // ---- Thẻ tổng quan ----
+  document.getElementById('stat-total-traffic').textContent = grandTraffic;
+  document.getElementById('stat-total-traffic-sub').textContent = `${classes.length} loại xe · ${allHours.length} mốc giờ`;
+
+  document.getElementById('stat-total-violations').textContent = grandViolations;
+  const rate = grandTraffic > 0 ? ((grandViolations / grandTraffic) * 100).toFixed(1) : '0.0';
+  document.getElementById('stat-violation-rate').textContent = `${rate}% trên tổng lượt xe`;
+
+  let peakHour = '–', peakVal = -1;
+  allHours.forEach((h, idx) => { if (totalPerHour[idx] > peakVal) { peakVal = totalPerHour[idx]; peakHour = h; } });
+  document.getElementById('stat-peak-hour').textContent = peakHour !== '–' ? fmtHour(peakHour) : '–';
+  document.getElementById('stat-peak-hour-sub').textContent = peakVal >= 0 ? `${peakVal} xe` : '\u00a0';
+
+  let topClass = '–', topVal = -1;
+  classes.forEach(c => {
+    const total = Object.values(classMap[c]).reduce((a, b) => a + b, 0);
+    if (total > topVal) { topVal = total; topClass = c; }
+  });
+  document.getElementById('stat-top-class').textContent = topClass !== '–' ? (classLabelsVi[topClass] || topClass) : '–';
+  document.getElementById('stat-top-class-sub').textContent = topVal >= 0 ? `${topVal} xe` : '\u00a0';
+}
+
+const daysSelect = document.getElementById('days-select');
+const customRangeInputs = document.getElementById('custom-range-inputs');
+
+daysSelect.addEventListener('change', () => {
+  if (daysSelect.value === 'custom') {
+    customRangeInputs.style.display = 'inline-flex';
+    const now = new Date();
+    const yesterday = new Date(now.getTime() - 24 * 3600 * 1000);
+    document.getElementById('custom-start').value = toDatetimeLocalValue(yesterday);
+    document.getElementById('custom-end').value = toDatetimeLocalValue(now);
+    showError(null);
+  } else {
+    customRangeInputs.style.display = 'none';
+    showError(null);
+    renderCombined();
+  }
+});
+
+document.getElementById('btn-apply-custom-range').addEventListener('click', renderCombined);
+
+renderCombined();
+</script>
+</body>
+</html>
