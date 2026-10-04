@@ -20,10 +20,10 @@ from utils import database
 # (small) de tang do chinh xac phan loai, danh doi toc do cham hon mot
 # chut (van chay tot real-time). Neu may chua co file nay, Ultralytics se
 # TU DONG TAI VE tu internet trong lan chay dau tien (~22MB) - can mang.
-VEHICLE_MODEL_PATH = "models/yolov8s.pt"          # model detect xe (tu dong tai neu chua co)
+# VEHICLE_MODEL_PATH = "models/yolov8s.pt"  # model gốc, dùng nếu model mới chưa tốt hơn
+VEHICLE_MODEL_PATH = "models/yolov8s_vn.pt"          # model detect xe (tu dong tai neu chua co)
 PLATE_MODEL_PATH = "models/plate_yolov8n.pt"       # model detect biển số (cần train riêng)
 LOCATION_NAME = "CAM_NGA_TU_01"
-VEHICLE_CLASSES = {2: "car", 3: "motorbike", 5: "bus", 7: "truck"}  # theo COCO id, chỉnh lại nếu model custom
 
 
 def run(video_source, enable_plate_reading=True):
@@ -32,7 +32,15 @@ def run(video_source, enable_plate_reading=True):
     G.reset_state()
 
     vehicle_model = YOLO(VEHICLE_MODEL_PATH)
-
+    # Lấy mapping class_id -> tên lớp TRỰC TIẾP từ model đang dùng, thay vì
+    # hardcode theo COCO id. Model gốc (80 lớp COCO) và model fine-tune riêng
+    # (4 lớp, id 0-3 theo data.yaml) đánh số lớp khác nhau hoàn toàn - hardcode
+    # cố định sẽ map sai (car/motorbike hiện đúng nhưng bus/truck bị đọc nhầm
+    # sang lớp khác, hoặc mất hẳn) mỗi khi đổi model. Cách này tự động đúng
+    # cho cả 2 trường hợp vì mỗi file .pt tự nhúng sẵn bảng tên lớp của nó.
+    model_names = vehicle_model.names
+    TARGET_CLASS_NAMES = {"car", "motorbike", "bus", "truck"}
+    VEHICLE_CLASSES = {cid: name for cid, name in model_names.items() if name in TARGET_CLASS_NAMES}
     plate_reader = None
     if enable_plate_reading:
         try:
@@ -110,6 +118,10 @@ def run(video_source, enable_plate_reading=True):
         # 30) - giảm tình trạng track bị đổi ID giữa chừng khi xe bị che
         # khuất thoáng qua đúng lúc cắt line, vốn làm mất lượt đếm đó do
         # hệ thống lưu "phía nào của line" theo track_id.
+        # FIX (xe xa/nhỏ khong duoc track on dinh): tang imgsz len 1280
+        # (mac dinh 640) de model "nhin" ro chi tiet xe nho/xa hon, tang
+        # confidence detect on dinh qua cac frame - phoi hop voi viec ha
+        # new_track_thresh trong custom_bytetrack.yaml.
         results = vehicle_model.track(
             frame, persist=True, verbose=False, tracker="custom_bytetrack.yaml",
             imgsz=1280
@@ -150,6 +162,11 @@ def run(video_source, enable_plate_reading=True):
                     prev_side_map[prev_key] = side
 
                     crossing_key = (track_id, line_idx)
+                    # FIX (Line 0 dem lay ca xe cua Line khac): them dieu
+                    # kien point_projects_onto_segment - chi tinh la cat
+                    # qua line khi diem cat nam TRONG doan thang thuc su
+                    # ve tren canvas, khong tinh ca duong thang keo dai
+                    # vo han (side_of_line von chi xet duong thang vo han).
                     if (prev_side is not None and prev_side * side < 0
                             and crossing_key not in counted_crossings
                             and point_projects_onto_segment((cx, cy), a, b)):
@@ -207,6 +224,13 @@ def run(video_source, enable_plate_reading=True):
         now = time.time()
         fps = 1.0 / max(now - prev_time, 1e-6)
         prev_time = now
+
+        # Ghi log FPS định kỳ (mỗi 30 frame, không phải mỗi frame) để phục
+        # vụ tính năng đo đạc hiệu năng tự động trong bảng đánh giá độ
+        # chính xác - không cần Trung tự đọc và ghi tay số FPS nữa.
+        if frame_idx % 30 == 0:
+            database.insert_performance_sample(fps)
+
         cv2.putText(frame, f"FPS: {fps:.1f}", (frame.shape[1] - 150, frame.shape[0] - 15),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
 

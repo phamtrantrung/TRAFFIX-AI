@@ -49,9 +49,16 @@ CREATE TABLE IF NOT EXISTS behavior_events (
     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS performance_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+    fps REAL
+);
+
 CREATE INDEX IF NOT EXISTS idx_violations_timestamp ON violations(timestamp);
 CREATE INDEX IF NOT EXISTS idx_stats_timestamp ON traffic_stats(timestamp);
 CREATE INDEX IF NOT EXISTS idx_behavior_timestamp ON behavior_events(timestamp);
+CREATE INDEX IF NOT EXISTS idx_performance_timestamp ON performance_log(timestamp);
 """
 
 # Schema mô tả súc tích để đưa vào prompt cho chatbot (Text-to-SQL)
@@ -340,6 +347,66 @@ def get_violation_summary():
         rows = conn.execute(
             """SELECT violation_type, COUNT(*) as total
                FROM violations GROUP BY violation_type"""
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+# --- Dùng cho tính năng đo đạc/đánh giá độ chính xác (Chương 4 báo cáo) ---
+
+def insert_performance_sample(fps):
+    """Ghi lại 1 mẫu FPS tức thời. Gọi định kỳ (không phải mỗi frame) từ
+    main.py để tránh ghi quá dày vào DB. Dùng datetime.now() (giờ local),
+    giống các bảng khác - tránh lặp lại lỗi lệch múi giờ đã gặp trước đây
+    với traffic_stats/roi_occupancy."""
+    with get_connection() as conn:
+        conn.execute(
+            "INSERT INTO performance_log (fps, timestamp) VALUES (?, ?)",
+            (fps, datetime.now())
+        )
+        conn.commit()
+
+
+def get_avg_fps(start=None, end=None, days_back=1):
+    """Trung bình FPS trong 1 khoảng thời gian - dùng cho sheet FPS của
+    bảng đánh giá, hoàn toàn tự động vì đây là số liệu hệ thống tự đo,
+    không cần đối chiếu với "sự thật" như đếm xe/vi phạm."""
+    clause, params = _time_filter_clause(days_back, start, end)
+    with get_connection() as conn:
+        row = conn.execute(
+            f"SELECT AVG(fps) as avg_fps, COUNT(*) as n FROM performance_log WHERE {clause}",
+            params
+        ).fetchone()
+        return dict(row) if row else {"avg_fps": None, "n": 0}
+
+
+def get_traffic_by_line(start_time, end_time):
+    """Lưu lượng xe theo từng line/loại xe trong 1 khoảng thời gian cụ thể
+    - dùng để tự động điền cột "Hệ thống ghi nhận" trong bảng đánh giá độ
+    chính xác đếm xe (sheet Dem_xe), thay vì Trung phải gõ tay."""
+    with get_connection() as conn:
+        rows = conn.execute(
+            """SELECT line_id, vehicle_class, SUM(count) as total
+               FROM traffic_stats
+               WHERE timestamp BETWEEN ? AND ?
+               GROUP BY line_id, vehicle_class
+               ORDER BY line_id, vehicle_class""",
+            (start_time, end_time)
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def get_violations_in_range(start_time, end_time):
+    """Danh sách vi phạm trong 1 khoảng thời gian, kèm đường dẫn ảnh bằng
+    chứng. Giữ lại để dùng độc lập nếu cần, dù generate_evaluation_xlsx
+    hiện tại lấy trực tiếp từ _fetch_report_data() để đảm bảo khớp KPI."""
+    with get_connection() as conn:
+        rows = conn.execute(
+            """SELECT id, track_id, vehicle_class, violation_type, location,
+                      timestamp, evidence_image_path
+               FROM violations
+               WHERE timestamp BETWEEN ? AND ?
+               ORDER BY timestamp""",
+            (start_time, end_time)
         ).fetchall()
         return [dict(r) for r in rows]
 

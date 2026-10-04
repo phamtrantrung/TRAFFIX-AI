@@ -353,7 +353,7 @@ def generate_docx_report(start_time: str, end_time: str) -> str:
 
     doc = Document()
 
-    title = doc.add_heading("BÁO CÁO PHÂN TÍCH GIÁM SÁT & PHẠT NGUỘI GIAO THÔNG", level=1)
+    title = doc.add_heading("BÁO CÁO PHÂN TÍCH — HỆ THỐNG GIÁM SÁT VÀ PHÁT HIỆN VI PHẠM GIAO THÔNG THÔNG MINH", level=1)
     title.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
     meta = doc.add_paragraph()
@@ -561,7 +561,7 @@ def generate_xlsx_report(start_time: str, end_time: str) -> str:
     # ---- Sheet 1: Tổng quan (thẻ KPI giống trang Phân tích) ----
     ws1 = wb.active
     ws1.title = "Tổng quan"
-    ws1["A6"] = "BÁO CÁO PHÂN TÍCH GIÁM SÁT & PHẠT NGUỘI GIAO THÔNG"
+    ws1["A6"] = "BÁO CÁO PHÂN TÍCH — HỆ THỐNG GIÁM SÁT VÀ PHÁT HIỆN VI PHẠM GIAO THÔNG THÔNG MINH"
     ws1["A6"].font = Font(size=14, bold=True)
     ws1["A7"] = f"Khoảng thời gian: {start_time} — {end_time}"
     ws1["A8"] = f"Ngày xuất: {datetime.now().strftime('%d/%m/%Y %H:%M')}"
@@ -662,3 +662,243 @@ def generate_xlsx_report(start_time: str, end_time: str) -> str:
     out_path = os.path.join(REPORTS_DIR, f"BaoCao_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx")
     wb.save(out_path)
     return out_path
+
+
+# ============================================================
+# 8. XUẤT BẢNG ĐÁNH GIÁ ĐỘ CHÍNH XÁC (thay thế nút "Xuất Excel" cũ)
+#    QUAN TRỌNG: dùng lại ĐÚNG _fetch_report_data()/_compute_kpis() -
+#    cùng 2 hàm đang phục vụ báo cáo Word/Excel - để tổng số xe/vi phạm
+#    trong bảng này LUÔN khớp với Dashboard, trang Phân tích và Trợ lý
+#    AI. Có thêm dòng đối chiếu tự động (✓ Khớp / ✗ Lệch) để dễ kiểm tra
+#    bằng mắt, không phải tin suông.
+# ============================================================
+
+from openpyxl.worksheet.datavalidation import DataValidation
+from openpyxl.drawing.image import Image as XLImage
+
+_thin_eval = Border(*[Side(style="thin", color="D0D5DD")] * 4)
+_YELLOW_FILL = PatternFill("solid", fgColor="FFF2CC")
+_GREEN_FILL = PatternFill("solid", fgColor="D9EAD3")
+
+
+def _eval_header(ws, row, headers):
+    for i, h in enumerate(headers, start=1):
+        c = ws.cell(row=row, column=i, value=h)
+        c.font = Font(bold=True, color="FFFFFF")
+        c.fill = PatternFill("solid", fgColor="1F4E78")
+        c.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        c.border = _thin_eval
+
+
+def generate_evaluation_xlsx(start_time: str, end_time: str) -> str:
+    """Xuất bảng đo đạc độ chính xác thực nghiệm - dùng cho Chương 4 báo
+    cáo TTTN. Dữ liệu hệ thống lấy từ CHÍNH _fetch_report_data()/
+    _compute_kpis() - hàm đang dùng cho báo cáo Word/Excel phân tích -
+    nên tổng số luôn khớp 100% với Dashboard/Phân tích/Báo cáo/Chatbot,
+    không có nguy cơ lệch do dùng 2 nguồn query khác nhau.
+    """
+    data = _fetch_report_data(start_time, end_time)
+    kpis = _compute_kpis(data)
+
+    # Số liệu đếm xe theo TỪNG LINE (chi tiết hơn _fetch_report_data,
+    # nhưng vẫn đọc từ đúng bảng traffic_stats với đúng khoảng thời gian
+    # - nên tổng cộng theo loại xe vẫn khớp với data["vehicle_counts"])
+    traffic_by_line = database.get_traffic_by_line(start_time, end_time)
+    violations = data["violations"]  # DÙNG LẠI list đã lấy trong _fetch_report_data
+    fps_info = database.get_avg_fps(start=start_time, end=end_time)
+
+    wb = Workbook()
+
+    # ---- Sheet 1: Hướng dẫn ----
+    ws0 = wb.active
+    ws0.title = "Huong_dan"
+    ws0.sheet_view.showGridLines = False
+    ws0.column_dimensions["A"].width = 100
+    guide_lines = [
+        ("BẢNG ĐÁNH GIÁ ĐỘ CHÍNH XÁC - TRAFFIX-AI", 14, True),
+        (f"Khoảng thời gian: {start_time} — {end_time}", 10, False),
+        ("", 11, False),
+        ("Số liệu hệ thống trong file này lấy từ CHÍNH nguồn dữ liệu đang phục vụ Dashboard, trang Phân tích, Trợ lý AI và báo cáo Word/Excel - nên tổng số xe/vi phạm LUÔN khớp nhau. Mỗi sheet có dòng đối chiếu (✓ Khớp / ✗ Lệch) để kiểm tra trực quan.", 11, False),
+        ("", 11, False),
+        ("Sheet 'Dem_xe': cột 'Hệ thống ghi nhận' đã tự động điền sẵn theo từng line. Xem lại video, đếm tay số xe thực tế, điền vào cột 'Thực tế (đếm tay)' (ô vàng) - % chính xác tự tính.", 11, False),
+        ("", 11, False),
+        ("Sheet 'Vi_pham_ROI': danh sách vi phạm + ảnh bằng chứng đã tự động điền, LẤY ĐÚNG danh sách đang hiển thị trong báo cáo Word/Excel. Chọn 'TP'/'FP' ở cột Đánh giá; nếu phát hiện vi phạm bị bỏ sót, thêm vào bảng FN phía dưới.", 11, False),
+        ("", 11, False),
+        ("Sheet 'FPS': tự động 100% từ log hệ thống.", 11, False),
+        ("", 11, False),
+        ("Sheet 'Tong_hop': tổng hợp toàn bộ kết quả kèm đối chiếu với KPI của Dashboard/Báo cáo - copy vào Chương 4 báo cáo.", 11, False),
+    ]
+    r = 1
+    for text, size, bold in guide_lines:
+        c = ws0.cell(row=r, column=1, value=text)
+        c.font = Font(bold=bold, size=size, color="1F4E78" if bold else "000000")
+        c.alignment = Alignment(wrap_text=True, vertical="top")
+        ws0.row_dimensions[r].height = 34 if len(text) > 90 else (20 if text else 8)
+        r += 1
+
+    # ---- Sheet 2: Dem_xe ----
+    ws1 = wb.create_sheet("Dem_xe")
+    headers1 = ["Line", "Loại xe", "Hệ thống ghi nhận", "Thực tế (đếm tay)", "Sai số tuyệt đối", "% Chính xác"]
+    _eval_header(ws1, 1, headers1)
+    ws1.freeze_panes = "A2"
+    row = 2
+    for item in traffic_by_line:
+        cls_label = CLASS_LABELS_VI.get(item["vehicle_class"], item["vehicle_class"])
+        ws1.cell(row=row, column=1, value=f"Line {item['line_id']}").border = _thin_eval
+        ws1.cell(row=row, column=2, value=cls_label).border = _thin_eval
+        ws1.cell(row=row, column=3, value=item["total"]).border = _thin_eval
+        input_cell = ws1.cell(row=row, column=4)
+        input_cell.fill = _YELLOW_FILL
+        input_cell.border = _thin_eval
+        ws1.cell(row=row, column=5, value=f"=IF(D{row}=\"\",\"\",ABS(D{row}-C{row}))").border = _thin_eval
+        acc_cell = ws1.cell(row=row, column=6, value=f'=IFERROR(1-E{row}/D{row},"")')
+        acc_cell.number_format = "0.0%"
+        acc_cell.border = _thin_eval
+        row += 1
+    if not traffic_by_line:
+        ws1.cell(row=2, column=1, value="Không có dữ liệu đếm xe trong khoảng thời gian này.")
+    last_dem_xe_row = max(row - 1, 2)
+    for i, w in enumerate([12, 14, 18, 18, 16, 14], start=1):
+        ws1.column_dimensions[get_column_letter(i)].width = w
+
+    ws1.cell(row=row + 1, column=1, value="TỔNG (hệ thống ghi nhận)").font = Font(bold=True)
+    sum_system_cell = ws1.cell(row=row + 1, column=3, value=f"=SUM(C2:C{last_dem_xe_row})")
+    sum_system_cell.font = Font(bold=True)
+    ws1.cell(row=row + 2, column=1, value="Tổng theo Dashboard/Báo cáo (KPI)").font = Font(bold=True)
+    kpi_total_cell = ws1.cell(row=row + 2, column=3, value=kpis["total_traffic"])
+    kpi_total_cell.font = Font(bold=True)
+    ws1.cell(row=row + 3, column=1, value="Đối chiếu").font = Font(bold=True)
+    check_cell = ws1.cell(row=row + 3, column=3,
+        value=f'=IF(C{row+1}=C{row+2},"✓ Khớp","✗ Lệch - kiểm tra lại")')
+    check_cell.font = Font(bold=True)
+    ws1.cell(row=row + 5, column=1, value="TRUNG BÌNH % CHÍNH XÁC").font = Font(bold=True)
+    avg_acc_cell = ws1.cell(row=row + 5, column=6,
+        value=f"=IFERROR(AVERAGE(F2:F{last_dem_xe_row}),\"\")")
+    avg_acc_cell.number_format = "0.0%"
+    avg_acc_cell.font = Font(bold=True)
+    avg_acc_row = row + 5
+
+    # ---- Sheet 3: Vi_pham_ROI (kèm ảnh bằng chứng nhúng sẵn) ----
+    ws2 = wb.create_sheet("Vi_pham_ROI")
+    headers2 = ["Thời gian", "Track ID", "Loại xe", "Vị trí", "Ảnh bằng chứng", "Đánh giá (TP/FP)"]
+    _eval_header(ws2, 1, headers2)
+    ws2.column_dimensions["E"].width = 22
+    for i, w in zip([1, 2, 3, 4, 6], [20, 10, 14, 18, 16]):
+        ws2.column_dimensions[get_column_letter(i)].width = w
+    ws2.freeze_panes = "A2"
+
+    dv = DataValidation(type="list", formula1='"TP,FP"', allow_blank=True)
+    ws2.add_data_validation(dv)
+
+    row = 2
+    for v in violations:
+        ws2.cell(row=row, column=1, value=str(v["timestamp"])).border = _thin_eval
+        ws2.cell(row=row, column=2, value=v["track_id"]).border = _thin_eval
+        ws2.cell(row=row, column=3, value=CLASS_LABELS_VI.get(v["vehicle_class"], v["vehicle_class"])).border = _thin_eval
+        ws2.cell(row=row, column=4, value=v["location"]).border = _thin_eval
+        img_path = _resolve_evidence_path(v.get("evidence_image_path"))
+        ws2.row_dimensions[row].height = 70
+        if img_path:
+            try:
+                img = XLImage(img_path)
+                img.width, img.height = 140, 90
+                ws2.add_image(img, f"E{row}")
+            except Exception:
+                ws2.cell(row=row, column=5, value="(không đọc được ảnh)")
+        else:
+            ws2.cell(row=row, column=5, value="(không có ảnh)")
+        eval_cell = ws2.cell(row=row, column=6)
+        eval_cell.fill = _YELLOW_FILL
+        eval_cell.border = _thin_eval
+        dv.add(eval_cell)
+        row += 1
+    if not violations:
+        ws2.cell(row=2, column=1, value="Không có vi phạm nào trong khoảng thời gian này.")
+    last_vio_row = max(row - 1, 2)
+
+    ws2.cell(row=row + 1, column=1, value="TỔNG (hệ thống ghi nhận)").font = Font(bold=True)
+    ws2.cell(row=row + 1, column=2, value=f"=COUNTA(A2:A{last_vio_row})").font = Font(bold=True)
+    ws2.cell(row=row + 2, column=1, value="Tổng theo Dashboard/Báo cáo (KPI)").font = Font(bold=True)
+    ws2.cell(row=row + 2, column=2, value=kpis["total_violations"]).font = Font(bold=True)
+    ws2.cell(row=row + 3, column=1, value="Đối chiếu").font = Font(bold=True)
+    ws2.cell(row=row + 3, column=2,
+        value=f'=IF(B{row+1}=B{row+2},"✓ Khớp","✗ Lệch - kiểm tra lại")').font = Font(bold=True)
+
+    fn_start = row + 5
+    ws2.cell(row=fn_start, column=1,
+        value="Vi phạm BỊ BỎ SÓT (FN) - xem video, thêm mô tả nếu phát hiện xe vi phạm mà hệ thống KHÔNG ghi nhận:").font = Font(bold=True, italic=True)
+    ws2.merge_cells(start_row=fn_start, start_column=1, end_row=fn_start, end_column=6)
+    fn_header_row = fn_start + 1
+    _eval_header(ws2, fn_header_row, ["Thời gian (ước lượng)", "", "Mô tả", "", "", ""])
+    ws2.merge_cells(start_row=fn_header_row, start_column=3, end_row=fn_header_row, end_column=6)
+    fn_input_start = fn_header_row + 1
+    for i in range(8):
+        for c in [1, 3]:
+            cell = ws2.cell(row=fn_input_start + i, column=c)
+            cell.fill = _YELLOW_FILL
+            cell.border = _thin_eval
+        ws2.merge_cells(start_row=fn_input_start + i, start_column=3,
+                         end_row=fn_input_start + i, end_column=6)
+    fn_input_end = fn_input_start + 7
+
+    sr = fn_input_end + 2
+    ws2.cell(row=sr, column=1, value="Tổng TP").font = Font(bold=True)
+    ws2.cell(row=sr, column=2, value=f'=COUNTIF(F2:F{last_vio_row},"TP")')
+    ws2.cell(row=sr + 1, column=1, value="Tổng FP").font = Font(bold=True)
+    ws2.cell(row=sr + 1, column=2, value=f'=COUNTIF(F2:F{last_vio_row},"FP")')
+    ws2.cell(row=sr + 2, column=1, value="Tổng FN").font = Font(bold=True)
+    ws2.cell(row=sr + 2, column=2, value=f'=COUNTA(A{fn_input_start}:A{fn_input_end})')
+    ws2.cell(row=sr + 3, column=1, value="Precision").font = Font(bold=True)
+    prec = ws2.cell(row=sr + 3, column=2, value=f"=IFERROR(B{sr}/(B{sr}+B{sr+1}),\"\")")
+    prec.number_format = "0.0%"
+    ws2.cell(row=sr + 4, column=1, value="Recall").font = Font(bold=True)
+    rec = ws2.cell(row=sr + 4, column=2, value=f"=IFERROR(B{sr}/(B{sr}+B{sr+2}),\"\")")
+    rec.number_format = "0.0%"
+    ws2.cell(row=sr + 5, column=1, value="F1-score").font = Font(bold=True)
+    f1 = ws2.cell(row=sr + 5, column=2, value=f"=IFERROR(2*B{sr+3}*B{sr+4}/(B{sr+3}+B{sr+4}),\"\")")
+    f1.number_format = "0.0%"
+
+    # ---- Sheet 4: FPS (tự động hoàn toàn) ----
+    ws3 = wb.create_sheet("FPS")
+    ws3.cell(row=1, column=1, value="FPS trung bình").font = Font(bold=True)
+    fps_val = ws3.cell(row=1, column=2, value=fps_info.get("avg_fps"))
+    fps_val.number_format = "0.0"
+    ws3.cell(row=2, column=1, value="Số mẫu đo được").font = Font(bold=True)
+    ws3.cell(row=2, column=2, value=fps_info.get("n") or 0)
+    ws3.cell(row=3, column=1, value="Khoảng thời gian").font = Font(bold=True)
+    ws3.cell(row=3, column=2, value=f"{start_time} — {end_time}")
+    ws3.column_dimensions["A"].width = 22
+    ws3.column_dimensions["B"].width = 30
+
+    # ---- Sheet 5: Tong_hop ----
+    ws4 = wb.create_sheet("Tong_hop")
+    ws4.column_dimensions["A"].width = 42
+    ws4.column_dimensions["B"].width = 18
+    ws4.column_dimensions["C"].width = 40
+    ws4.cell(row=1, column=1, value="BẢNG TỔNG HỢP KẾT QUẢ THỰC NGHIỆM").font = Font(bold=True, size=14, color="1F4E78")
+    _eval_header(ws4, 3, ["Chỉ số", "Giá trị", "Nguồn"])
+    dem_xe_total_row = avg_acc_row - 4
+    vio_kpi_row = row + 2
+    summary = [
+        ("Tổng lượt xe - đối chiếu Dashboard/Báo cáo", f"=Dem_xe!C{dem_xe_total_row}", "0", "Sheet Dem_xe"),
+        ("Tổng vi phạm - đối chiếu Dashboard/Báo cáo", f"=Vi_pham_ROI!B{vio_kpi_row}", "0", "Sheet Vi_pham_ROI"),
+        ("Độ chính xác đếm xe trung bình", f"=Dem_xe!F{avg_acc_row}", "0.0%", "Sheet Dem_xe"),
+        ("Precision (vi phạm ROI)", f"=Vi_pham_ROI!B{sr+3}", "0.0%", "Sheet Vi_pham_ROI"),
+        ("Recall (vi phạm ROI)", f"=Vi_pham_ROI!B{sr+4}", "0.0%", "Sheet Vi_pham_ROI"),
+        ("F1-score (vi phạm ROI)", f"=Vi_pham_ROI!B{sr+5}", "0.0%", "Sheet Vi_pham_ROI"),
+        ("FPS trung bình", "=FPS!B1", "0.0", "Sheet FPS (tự động)"),
+    ]
+    rr = 4
+    for label, formula, fmt, source in summary:
+        ws4.cell(row=rr, column=1, value=label).border = _thin_eval
+        c = ws4.cell(row=rr, column=2, value=formula)
+        c.number_format = fmt
+        c.font = Font(bold=True)
+        c.border = _thin_eval
+        ws4.cell(row=rr, column=3, value=source).border = _thin_eval
+        rr += 1
+
+    out_path = os.path.join(REPORTS_DIR, f"DanhGia_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx")
+    wb.save(out_path)
+    return out_path
+

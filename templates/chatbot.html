@@ -8,7 +8,7 @@
 </head>
 <body>
 <header>
-  <h1>🚦 Hệ thống Giám sát &amp; Phạt nguội Giao thông</h1>
+  <h1>🚦 Hệ Thống Giám Sát Và Phát Hiện Vi Phạm Giao Thông Thông Minh</h1>
   <nav>
     <a href="/">Dashboard</a>
     <a href="/analytics">Phân tích</a>
@@ -36,6 +36,11 @@ const chatWindow = document.getElementById("chat-window");
 const chatForm = document.getElementById("chat-form");
 const chatInput = document.getElementById("chat-input");
 
+// Màu chữ/lưới dùng chung cho mọi biểu đồ, lấy theo đúng bảng màu nền
+// tối của trang (biến --text, --text-dim, --border trong style.css).
+const CHART_TEXT_COLOR = "#e6eaf3";
+const CHART_GRID_COLOR = "rgba(230, 234, 243, 0.12)";
+
 function appendMessage(text, sender) {
   const div = document.createElement("div");
   div.className = `msg ${sender}`;
@@ -48,22 +53,93 @@ function appendMessage(text, sender) {
 function appendChart(chartData) {
   const wrapper = document.createElement("div");
   wrapper.className = "msg bot chart-msg";
+
+  // Tiêu đề riêng phía trên canvas, tách biệt khỏi title plugin của
+  // Chart.js để không bị co lại chung với canvas khi resize.
+  if (chartData.title) {
+    const titleEl = document.createElement("div");
+    titleEl.className = "chart-title";
+    titleEl.textContent = chartData.title;
+    wrapper.appendChild(titleEl);
+  }
+
+  const canvasBox = document.createElement("div");
+  canvasBox.className = "chart-canvas-box";
   const canvas = document.createElement("canvas");
-  wrapper.appendChild(canvas);
+  canvasBox.appendChild(canvas);
+  wrapper.appendChild(canvasBox);
+
   chatWindow.appendChild(wrapper);
   chatWindow.scrollTop = chatWindow.scrollHeight;
 
-  new Chart(canvas, {
-    type: chartData.type || "bar",
-    data: {
-      labels: chartData.labels,
-      datasets: [{ label: chartData.label, data: chartData.values, backgroundColor: "#4fd1c5" }]
-    },
-    options: { responsive: true, plugins: { legend: { display: false } } }
+  const colors = chartData.colors && chartData.colors.length === chartData.labels.length
+    ? chartData.colors
+    : chartData.labels.map(() => "#4fd1c5");
+
+  const isLine = chartData.type === "line";
+
+  // Đợi trình duyệt hoàn tất 1 khung hình layout trước khi Chart.js đo
+  // kích thước container - tránh trường hợp đo được width/height = 0
+  // ngay lúc canvas vừa được chèn vào DOM, gây co nhỏ ngẫu nhiên.
+  requestAnimationFrame(() => {
+    new Chart(canvas, {
+      type: chartData.type || "bar",
+      data: {
+        labels: chartData.labels,
+        datasets: [{
+          label: chartData.label,
+          data: chartData.values,
+          backgroundColor: isLine ? "rgba(79, 209, 197, 0.18)" : colors,
+          borderColor: isLine ? "#4fd1c5" : colors,
+          borderWidth: isLine ? 2 : 1,
+          borderRadius: isLine ? 0 : 6,
+          fill: isLine,
+          tension: isLine ? 0.3 : 0,
+          pointBackgroundColor: "#4fd1c5",
+          pointRadius: isLine ? 3 : 0,
+          maxBarThickness: 46,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        layout: { padding: { top: 8, right: 8 } },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: "#161d30",
+            borderColor: "#2a3145",
+            borderWidth: 1,
+            titleColor: CHART_TEXT_COLOR,
+            bodyColor: CHART_TEXT_COLOR,
+            padding: 10,
+            displayColors: false,
+          },
+        },
+        scales: {
+          x: {
+            ticks: { color: CHART_TEXT_COLOR, font: { size: 11 } },
+            grid: { color: "transparent" },
+          },
+          y: {
+            beginAtZero: true,
+            ticks: { color: CHART_TEXT_COLOR, font: { size: 11 }, precision: 0 },
+            grid: { color: CHART_GRID_COLOR },
+          },
+        },
+      }
+    });
   });
 }
 
 async function sendQuestion(question) {
+  // FIX (hiện "Lỗi kết nối tới server" giả khi bấm Gửi/Enter liên tiếp):
+  // khóa nút Gửi trong lúc đang chờ Gemini trả lời (thường vài giây vì
+  // phải gọi model 2 lần - sinh SQL rồi diễn giải kết quả), tránh gửi
+  // trùng nhiều request cùng lúc.
+  const sendBtn = chatForm.querySelector("button[type=submit]");
+  sendBtn.disabled = true;
+
   appendMessage(question, "user");
   const loadingEl = appendMessage("Đang xử lý...", "bot-loading");
 
@@ -82,6 +158,8 @@ async function sendQuestion(question) {
   } catch (e) {
     loadingEl.remove();
     appendMessage("Lỗi kết nối tới server.", "bot");
+  } finally {
+    sendBtn.disabled = false;
   }
 }
 

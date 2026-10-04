@@ -281,7 +281,11 @@ def export_report_xlsx():
         return jsonify({"error": "Thiếu start_time hoặc end_time"}), 400
 
     try:
-        file_path = report_generator.generate_xlsx_report(start_time, end_time)
+        # THAY ĐỔI: nút "Xuất Excel" giờ xuất bảng ĐÁNH GIÁ ĐỘ CHÍNH XÁC
+        # (đếm xe/vi phạm/FPS, có đối chiếu với KPI Dashboard) thay vì
+        # báo cáo phân tích thông thường như trước - phục vụ Chương 4
+        # báo cáo TTTN (kết quả kiểm thử thực nghiệm).
+        file_path = report_generator.generate_evaluation_xlsx(start_time, end_time)
         return send_file(file_path, as_attachment=True)
     except Exception as e:
         return jsonify({"error": f"Không thể tạo báo cáo: {e}"}), 500

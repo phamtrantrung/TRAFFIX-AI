@@ -24,7 +24,7 @@ from ultralytics import YOLO
 MODEL_PATH = "models/yolov8s.pt"
 IMAGES_ROOT = "dataset/images"
 LABELS_ROOT = "dataset/labels"
-CONF_THRESHOLD = 0.35  # bỏ qua các phát hiện có độ tin cậy quá thấp
+CONF_THRESHOLD = 0.20  # bỏ qua các phát hiện có độ tin cậy quá thấp
 
 # Map từ class COCO gốc (id model yolov8s) -> id lớp mới trong dataset
 # riêng của mình (thứ tự này PHẢI khớp với "names" trong data.yaml)

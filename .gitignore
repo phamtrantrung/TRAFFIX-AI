@@ -10,3 +10,5 @@ models/*.pt
 archives/*.json
 reports/
 dataset/
+__pycache__/
+runs/
