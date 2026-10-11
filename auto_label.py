@@ -1,22 +1,13 @@
 """
-Bước 2: Tự động gán nhãn sơ bộ cho ảnh vừa trích, dùng chính model
-yolov8s đang chạy trong hệ thống. Sinh ra file .txt định dạng YOLO
-(class_id x_center y_center width height - tất cả normalize 0-1) cho
-từng ảnh, đặt cùng tên, trong dataset/labels/train và dataset/labels/val.
+Bước 2: Tự động gán nhãn sơ bộ cho ảnh vừa trích, dùng model yolov8s
+hiện tại. Sinh file .txt định dạng YOLO (class_id x_center y_center
+width height, chuẩn hóa 0-1) vào dataset/labels/train và dataset/labels/val.
 
-QUAN TRỌNG: đây chỉ là nhãn SƠ BỘ để bạn đỡ phải vẽ box từ đầu. Bạn VẪN
-CẦN dùng công cụ gán nhãn (khuyên dùng LabelImg, xem hướng dẫn bên dưới)
-để:
-  1. Sửa lại các nhãn bị NHẦM LOẠI XE (đúng trọng tâm vấn đề đang gặp -
-     xe tải bị nhận nhầm thành xe buýt, v.v.)
-  2. Thêm box cho các xe mà model BỎ SÓT hoàn toàn
-  3. Xóa box sai / box của vật không phải xe
-
-Cài LabelImg (chạy 1 lần):
-    pip install labelImg --break-system-packages
-Mở LabelImg để sửa nhãn:
-    labelImg dataset/images/train dataset/classes.txt
-(Nhớ chọn định dạng "YOLO" trong LabelImg, góc dưới bên trái cửa sổ)
+Đây chỉ là nhãn SƠ BỘ. Sau khi chạy, vào makesense.ai:
+  1. Nạp ảnh + dataset/classes.txt, chọn Object Detection
+  2. Actions -> Import Annotations -> YOLO, nạp các file .txt
+  3. Sửa box nhầm loại xe, thêm xe bị sót, xóa box sai
+  4. Actions -> Export Annotations (YOLO), ghi đè vào dataset/labels/
 """
 import os
 from ultralytics import YOLO
@@ -82,4 +73,4 @@ for split in ("train", "val"):
             print(f"  ...{idx + 1}/{len(image_files)}")
 
 print("DONE! Nhãn sơ bộ đã lưu trong dataset/labels/train và dataset/labels/val")
-print("Bước tiếp theo: mở LabelImg để SOÁT LẠI và sửa các nhãn sai (đặc biệt car/truck/bus).")
+print("Bước tiếp theo: nạp vào makesense.ai để soát lại (đặc biệt car/truck/bus).")
