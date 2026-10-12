@@ -1,15 +1,19 @@
 # AI CHATBOT ENGINE (Text-to-SQL) - Dùng Google Gemini
 #
-# Yêu cầu: pip install google-generativeai
-# Cần biến môi trường GOOGLE_API_KEY đã được set.
+# Yêu cầu: pip install google-generativeai python-dotenv
+# Cần GOOGLE_API_KEY (đặt trong file .env hoặc biến môi trường).
 
 import os
 import re
 from datetime import datetime, timedelta
 
 import google.generativeai as genai
+from dotenv import load_dotenv
 
 from utils import database
+
+# Nạp GOOGLE_API_KEY từ file .env ở thư mục gốc dự án (nếu có)
+load_dotenv()
 
 MODEL_NAME = "gemini-3.5-flash-lite"   # Có thể đổi thành gemini thích hợp
 
@@ -89,7 +93,7 @@ def natural_language_to_sql(question: str) -> str:
 NGƯỜI DÙNG ĐANG MUỐN XEM BIỂU ĐỒ. Vì vậy câu SQL BẮT BUỘC phải trả về
 kết quả dạng NHÓM (GROUP BY) với đúng 2 cột: một cột tên nhóm (ví dụ
 vehicle_class, hoặc khung giờ) và một cột số lượng (COUNT/SUM), trả về
-từ 2 dòng trở lên. TUYỆT ĐỐI KHÔNG trả về một con số tổng duy nhất
+từ 2 dòng trở lên. Nếu câu hỏi nhắc tới 2 tiêu chí cùng lúc (ví dụ vừa loại xe vừa khung giờ), CHỈ\nchọn MỘT tiêu chí để nhóm: ưu tiên khung giờ nếu có nói tới khung giờ, ngược lại\nnhóm theo loại xe. TUYỆT ĐỐI KHÔNG trả về 3 cột.\nTUYỆT ĐỐI KHÔNG trả về một con số tổng duy nhất
 (như SELECT COUNT(*) không GROUP BY) vì sẽ không có gì để vẽ.
 Nếu câu hỏi không nói rõ nhóm theo gì, mặc định nhóm theo loại phương
 tiện (vehicle_class) trong phạm vi thời gian gần nhất hợp lý (ví dụ
@@ -129,25 +133,61 @@ QUY TẮC BẮT BUỘC:
     return _extract_sql(response.text)
 
 
-def explain_result(question: str, sql: str, result_rows: list) -> str:
+def _strip_markdown(text: str) -> str:
+    """Giao diện hiển thị văn bản thuần, nên bỏ các ký hiệu markdown còn sót."""
+    text = re.sub(r"\*\*|__", "", text)
+    text = re.sub(r"^\s*[\*\-]\s+", "", text, flags=re.MULTILINE)
+    text = re.sub(r"\s\*\s+", "; ", text)
+    text = text.replace("*", "")
+    return text.strip()
+
+
+def explain_result(question: str, sql: str, result_rows: list, has_chart: bool = False) -> str:
     model = _get_model()
 
     system_prompt = """Bạn là trợ lý phân tích dữ liệu giao thông.
 Nhiệm vụ: dựa vào câu hỏi gốc và kết quả truy vấn database, trả lời
 bằng tiếng Việt, ngắn gọn, tự nhiên, dễ hiểu cho người không rành kỹ
-thuật. Không nhắc đến SQL hay tên bảng/cột trong câu trả lời."""
+thuật. Không nhắc đến SQL hay tên bảng/cột trong câu trả lời.
+TUYỆT ĐỐI không nói "đã vẽ", "biểu đồ đã sẵn sàng" hay hứa vẽ biểu đồ,
+vì việc vẽ do hệ thống tự làm; chỉ nêu số liệu và nhận xét.
+Chỉ viết văn bản thuần, KHÔNG dùng markdown (không dấu *, **, #, gạch đầu dòng);
+nếu liệt kê thì viết liền trong câu, cách nhau bằng dấu phẩy hoặc chấm phẩy."""
 
-    user_content = f"""Câu hỏi: {question}
+    chart_note = "\n(Hệ thống đang hiển thị biểu đồ ngay bên dưới câu trả lời này.)" if has_chart else ""
+    user_content = f"""Câu hỏi: {question}{chart_note}
 Kết quả truy vấn (JSON): {result_rows}
 
 Trả lời ngắn gọn bằng tiếng Việt."""
 
     full_prompt = system_prompt + "\n\n" + user_content
     response = model.generate_content(full_prompt)
-    return response.text
+    return _strip_markdown(response.text)
 
 
 _TIME_LABEL_RE = re.compile(r"^\d{1,2}([:h]\d{2})|^\d{4}-\d{2}-\d{2}|^\d{1,2}h$")
+
+
+# Tên cột -> tiếng Việt để tiêu đề biểu đồ dễ đọc (cột lạ thì giữ nguyên tên).
+COLUMN_NAMES_VI = {
+    "vehicle_class": "loại xe", "violation_type": "loại vi phạm",
+    "direction": "hướng", "location": "vị trí", "hour": "giờ",
+    "hour_of_day": "giờ", "time_slot": "khung giờ", "timeslot": "khung giờ",
+    "slot": "khung giờ", "time": "thời gian", "time_bucket": "khung giờ",
+    "minute_slot": "phút", "hour_slot": "giờ", "khung_gio": "khung giờ", "day": "ngày", "date": "ngày", "minute": "phút",
+    "count": "Số lượng", "total": "Tổng số", "total_count": "Tổng số",
+    "so_luong": "Số lượng", "violations": "Số vi phạm",
+    "violation_count": "Số vi phạm", "vehicle_count": "Số xe",
+}
+
+
+def _vi_name(col: str) -> str:
+    key = col.strip().lower()
+    if key in COLUMN_NAMES_VI:
+        name = COLUMN_NAMES_VI[key]
+    else:
+        name = col.replace("_", " ")
+    return name[:1].upper() + name[1:]
 
 
 def _pick_color(label: str, idx: int) -> str:
@@ -184,7 +224,7 @@ def _try_build_chart_data(rows: list, question: str = ""):
 
     colors = [_pick_color(l, i) for i, l in enumerate(labels)]
 
-    title = f"{value_key.replace('_', ' ').capitalize()} theo {label_key.replace('_', ' ')}"
+    title = f"{_vi_name(value_key)} theo {_vi_name(label_key).lower()}"
 
     return {
         "type": chart_type,
@@ -219,12 +259,12 @@ def ask(question: str) -> dict:
     except Exception as e:
         return {"answer": f"Không thể truy vấn dữ liệu: {e}", "sql": sql, "error": True}
 
+    chart_data = _try_build_chart_data(rows, question)
+
     try:
-        answer = explain_result(question, sql, rows)
+        answer = explain_result(question, sql, rows, has_chart=chart_data is not None)
     except Exception as e:
         answer = f"Đã lấy được {len(rows)} kết quả nhưng không thể diễn giải: {e}"
-
-    chart_data = _try_build_chart_data(rows, question)
 
     # Nếu người dùng rõ ràng muốn xem biểu đồ nhưng dữ liệu trả về không
     # đủ điều kiện để vẽ (ví dụ chỉ có 1 dòng/1 loại xe duy nhất trong
