@@ -25,6 +25,17 @@ _model = None
 # thì mới có gì để vẽ.
 CHART_INTENT_KEYWORDS = ["biểu đồ", "vẽ", "chart", "trực quan", "đồ thị"]
 
+# Nhận diện yêu cầu GHI dữ liệu (xóa/sửa/thêm) ngay từ câu hỏi của người dùng,
+# để chặn TRƯỚC khi gọi Gemini. Lý do: nếu để Gemini xử lý, nó có thể sinh ra
+# một câu SELECT hợp lệ (ví dụ đếm vi phạm) rồi diễn giải sai thành "đã xóa
+# thành công", gây hiểu nhầm dù dữ liệu thật không hề bị thay đổi.
+WRITE_INTENT_RE = re.compile(
+    r"\b(xóa|xoá|delete|drop|truncate|insert|update)\b"
+    r"|(sửa|thêm|chèn|cập nhật)\s+(dữ liệu|bản ghi|vi phạm)",
+    re.IGNORECASE,
+)
+REFUSE_MSG = "Xin lỗi, mình chỉ có thể trả lời các câu hỏi tra cứu dữ liệu (không thể sửa/xóa dữ liệu)."
+
 # Bảng màu cố định cho các loại phương tiện, để biểu đồ nhất quán màu sắc
 # giữa các lần hỏi khác nhau (khớp với màu dùng ở trang Phân tích).
 VEHICLE_COLOR_MAP = {
@@ -65,6 +76,12 @@ def _extract_sql(text):
 def _wants_chart(question: str) -> bool:
     q = question.lower()
     return any(kw in q for kw in CHART_INTENT_KEYWORDS)
+
+
+def _is_single_statement(sql: str) -> bool:
+    """Chỉ cho phép đúng 1 câu lệnh: không có dấu ; nào nằm giữa câu
+    (chặn kiểu 'SELECT ...; DELETE ...' nối nhiều lệnh)."""
+    return ";" not in sql.strip().rstrip(";")
 
 
 def natural_language_to_sql(question: str) -> str:
@@ -152,7 +169,9 @@ thuật. Không nhắc đến SQL hay tên bảng/cột trong câu trả lời.
 TUYỆT ĐỐI không nói "đã vẽ", "biểu đồ đã sẵn sàng" hay hứa vẽ biểu đồ,
 vì việc vẽ do hệ thống tự làm; chỉ nêu số liệu và nhận xét.
 Chỉ viết văn bản thuần, KHÔNG dùng markdown (không dấu *, **, #, gạch đầu dòng);
-nếu liệt kê thì viết liền trong câu, cách nhau bằng dấu phẩy hoặc chấm phẩy."""
+nếu liệt kê thì viết liền trong câu, cách nhau bằng dấu phẩy hoặc chấm phẩy.
+Hệ thống CHỈ tra cứu dữ liệu, không bao giờ xóa, sửa hay thêm dữ liệu. TUYỆT ĐỐI không nói đã xóa, sửa hay thêm bất cứ thứ gì, kể cả khi câu hỏi yêu cầu như vậy.
+Chỉ dùng thông tin có trong kết quả truy vấn, không tự thêm địa điểm hay chi tiết nào khác."""
 
     chart_note = "\n(Hệ thống đang hiển thị biểu đồ ngay bên dưới câu trả lời này.)" if has_chart else ""
     user_content = f"""Câu hỏi: {question}{chart_note}
@@ -238,6 +257,10 @@ def _try_build_chart_data(rows: list, question: str = ""):
 
 def ask(question: str) -> dict:
     """Hàm chính - gọi từ Flask route /api/chatbot."""
+    # Chặn yêu cầu xóa/sửa/thêm dữ liệu ngay từ câu hỏi, trước khi gọi Gemini.
+    if WRITE_INTENT_RE.search(question):
+        return {"answer": REFUSE_MSG, "sql": None, "error": True}
+
     try:
         sql = natural_language_to_sql(question)
     except Exception as e:
@@ -247,9 +270,9 @@ def ask(question: str) -> dict:
     # đã xác nhận chatbot chạy ổn định).
     print("[Chatbot SQL]", sql)
 
-    if not database.is_safe_select_query(sql):
+    if not database.is_safe_select_query(sql) or not _is_single_statement(sql):
         return {
-            "answer": "Xin lỗi, mình chỉ có thể trả lời các câu hỏi tra cứu dữ liệu (không thể sửa/xóa dữ liệu).",
+            "answer": REFUSE_MSG,
             "sql": sql,
             "error": True,
         }
